@@ -181,81 +181,63 @@
 
   shadow.innerHTML = `
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
-
-      /* ── Reset ─────────────────────────────────────────── */
       * { box-sizing: border-box; margin: 0; padding: 0; }
 
-      /* ── Retro-pop palette ──────────────────────────────
-         hot-pink  : #FF2D87
-         cyan      : #00E5FF
-         yellow    : #FFE500
-         e-blue    : #3D5AFE
-         purple    : #CC00FF
-         black     : #0D0D0D
-         cream     : #FFFDF0
-      ────────────────────────────────────────────────────── */
+      /* shared font — system stack, no external request */
+      * { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
 
-      /* ── Badge (collapsed state) ─────────────────────── */
+      /* ── Badge (collapsed) ───────────────────────────── */
       #badge {
         display: inline-flex;
         align-items: center;
-        gap: 7px;
-        background: linear-gradient(135deg, #ff6eb4, #ff2d87);
+        gap: 6px;
+        background: #f43f7e;
         color: #fff;
-        padding: 9px 18px 9px 14px;
+        padding: 7px 14px 7px 11px;
         border-radius: 999px;
-        box-shadow: 0 4px 16px rgba(255,45,135,0.45);
-        font-family: 'Fredoka One', 'Arial Black', Impact, sans-serif;
-        font-size: 14px;
-        letter-spacing: 0.3px;
+        font-size: 13px;
+        font-weight: 600;
         cursor: pointer;
         user-select: none;
         white-space: nowrap;
-        transition: transform 0.15s, box-shadow 0.15s;
+        box-shadow: 0 2px 10px rgba(244,63,126,0.35);
+        transition: box-shadow 0.15s, transform 0.15s;
       }
-      #badge:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(255,45,135,0.55);
-      }
-      #badge:active {
-        transform: translateY(1px);
-        box-shadow: 0 2px 8px rgba(255,45,135,0.35);
-      }
+      #badge:hover  { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(244,63,126,0.4); }
+      #badge:active { transform: translateY(1px);  box-shadow: 0 1px 6px rgba(244,63,126,0.3); }
 
-      /* ── Player card (expanded state) ───────────────── */
+      /* ── Player card (expanded) ──────────────────────── */
       #player {
         display: none;
         flex-direction: column;
-        gap: 0;
-        background: #fff8fd;
-        border-radius: 20px;
-        box-shadow: 0 8px 32px rgba(200,0,180,0.18), 0 2px 8px rgba(0,0,0,0.08);
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.06);
         min-width: 260px;
         overflow: hidden;
-        position: relative;
       }
       #player.visible { display: flex; }
 
-      /* Coloured top stripe */
+      /* Thin pink accent bar at top */
       #player-stripe {
-        background: linear-gradient(90deg, #00E5FF 0%, #CC00FF 50%, #FF2D87 100%);
-        height: 6px;
+        background: #f43f7e;
+        height: 3px;
         width: 100%;
       }
 
-      /* Header row: title + close */
+      /* Header */
       #player-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 10px 14px 4px;
+        padding: 10px 12px 6px;
       }
       #player-title {
-        font-family: 'Fredoka One', 'Arial Black', Impact, sans-serif;
-        font-size: 13px;
-        color: #c026d3;
-        letter-spacing: 0.4px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #9ca3af;
+        letter-spacing: 1px;
+        text-transform: uppercase;
         display: flex;
         align-items: center;
         gap: 5px;
@@ -266,84 +248,70 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 8px 14px 12px;
+        padding: 4px 12px 12px;
       }
 
       /* ── Buttons ─────────────────────────────────────── */
       button {
         border: none;
         border-radius: 50%;
-        width: 36px;
-        height: 36px;
-        font-size: 14px;
+        width: 34px;
+        height: 34px;
+        font-size: 13px;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        font-family: 'Fredoka One', 'Arial Black', sans-serif;
-        transition: transform 0.15s, box-shadow 0.15s;
-        box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+        transition: opacity 0.15s, transform 0.15s;
       }
-      button:hover  { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.18); }
-      button:active { transform: translateY(1px);  box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+      button:hover  { opacity: 0.85; transform: translateY(-1px); }
+      button:active { opacity: 1;    transform: translateY(1px); }
       button:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
 
-      /* Play/pause — cyan */
-      #btn-play { background: linear-gradient(135deg, #00E5FF, #00b8d9); color: #fff; font-size: 15px; }
+      /* Play/pause — pink */
+      #btn-play { background: #f43f7e; color: #fff; font-size: 14px; }
 
-      /* Stop — purple */
-      #btn-stop { background: linear-gradient(135deg, #e040fb, #aa00ff); color: #fff; font-size: 12px; }
+      /* Stop — light gray */
+      #btn-stop { background: #f3f4f6; color: #374151; font-size: 11px; }
 
-      /* Speed — yellow-pink, pill shaped */
+      /* Speed — pill, gray */
       #btn-speed {
-        background: linear-gradient(135deg, #ffd6ec, #ffb3d9);
-        color: #c026d3;
+        background: #f3f4f6;
+        color: #374151;
         border-radius: 999px;
         width: auto;
+        height: 28px;
         padding: 0 10px;
         font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.3px;
+        font-weight: 600;
       }
 
-      /* Close — small, top-right */
+      /* Close — top-right, minimal */
       #btn-close {
-        background: #f3e8ff;
-        color: #9c27b0;
+        background: transparent;
+        color: #9ca3af;
         border-radius: 50%;
-        width: 24px;
-        height: 24px;
-        font-size: 11px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        width: 22px;
+        height: 22px;
+        font-size: 12px;
       }
-      #btn-close:hover { background: #ff6eb4; color: #fff; }
+      #btn-close:hover { background: #f3f4f6; color: #374151; }
 
       /* ── Progress label ──────────────────────────────── */
       #progress {
         flex: 1;
-        font-family: 'Fredoka One', 'Arial Black', sans-serif;
         font-size: 12px;
-        color: #a855f7;
-        text-align: center;
-        letter-spacing: 0.5px;
+        font-weight: 500;
+        color: #6b7280;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
       }
-
-      /* ── Decorative shapes (pure CSS / inline SVG) ───── */
-      .deco {
-        position: absolute;
-        pointer-events: none;
-        user-select: none;
-      }
-      #deco-star   { top: 8px;  right: 44px; opacity: 0.55; }
-      #deco-tri    { bottom: 8px; left: 12px; opacity: 0.45; }
-      #deco-squig  { top: 28px; right: 10px; opacity: 0.4; }
     </style>
 
     <!-- Collapsed pill badge -->
     <div id="badge">
-      <!-- Headphone icon -->
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
         <path d="M3 18v-6a9 9 0 0118 0v6" stroke="rgba(255,255,255,0.9)" stroke-width="2.5" stroke-linecap="round"/>
         <rect x="1" y="16" width="4" height="6" rx="2" fill="rgba(255,255,255,0.9)"/>
         <rect x="19" y="16" width="4" height="6" rx="2" fill="rgba(255,255,255,0.9)"/>
@@ -353,45 +321,26 @@
 
     <!-- Expanded player card -->
     <div id="player">
-      <!-- Rainbow stripe at top -->
       <div id="player-stripe"></div>
 
-      <!-- Header -->
       <div id="player-head">
         <span id="player-title">
-          <!-- Cassette icon -->
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <rect x="2" y="5" width="20" height="14" rx="3" fill="#f0abfc"/>
-            <circle cx="8"  cy="12" r="2.5" fill="#c026d3"/>
-            <circle cx="16" cy="12" r="2.5" fill="#c026d3"/>
-            <rect x="8" y="15" width="8" height="2.5" rx="1" fill="#c026d3"/>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M9 18V5l12-2v13" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="6" cy="18" r="3" stroke="#9ca3af" stroke-width="2"/>
+            <circle cx="18" cy="16" r="3" stroke="#9ca3af" stroke-width="2"/>
           </svg>
-          READ ALOUD
+          Read Aloud
         </span>
         <button id="btn-close" title="Close">✕</button>
       </div>
 
-      <!-- Controls -->
       <div id="player-controls">
         <button id="btn-play" title="Play · Alt+Shift+R">▶</button>
         <button id="btn-stop" title="Stop">■</button>
         <button id="btn-speed" title="Change speed">1×</button>
-        <span id="progress">${hasContent ? `0:00 / ${secsToMMSS(totalSecs())}` : 'Too short!'}</span>
+        <span id="progress">${hasContent ? `0:00 / ${secsToMMSS(totalSecs())}` : 'Too short'}</span>
       </div>
-
-      <!-- Decorative shapes -->
-      <svg id="deco-star" class="deco" width="18" height="18" viewBox="0 0 24 24">
-        <polygon points="12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9"
-          fill="#f9a8d4"/>
-      </svg>
-      <svg id="deco-tri" class="deco" width="14" height="14" viewBox="0 0 24 24">
-        <polygon points="12,3 22,21 2,21"
-          fill="#a5f3fc"/>
-      </svg>
-      <svg id="deco-squig" class="deco" width="18" height="28" viewBox="0 0 18 28">
-        <path d="M9 2 C14 6, 4 10, 9 14 C14 18, 4 22, 9 26"
-          stroke="#CC00FF" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-      </svg>
     </div>
   `;
 
