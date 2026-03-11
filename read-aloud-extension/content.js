@@ -7,32 +7,33 @@
 
   // ─── 1. EXTRACT READABLE TEXT ────────────────────────────────────────────────
   function extractText() {
-    // Primary: Mozilla Readability (handles Medium, Substack, dynamic class names)
+    // Primary: Mozilla Readability — requires both a title and substantial body
+    // so homepages/feeds (no article title) are correctly excluded
     try {
       const docClone = document.cloneNode(true);
       // Strip code blocks — they sound terrible when read aloud
       docClone.querySelectorAll('pre, code').forEach(el => el.remove());
       const article = new Readability(docClone).parse(); // eslint-disable-line no-undef
-      if (article?.textContent?.trim().length > 200) {
+      if (article?.title?.trim() && article?.textContent?.trim().length > 200) {
         return article.textContent.trim();
       }
     } catch (_) {
       // Readability failed, fall through to selector strategy
     }
 
-    // Fallback: semantic selectors in priority order
+    // Fallback: semantic selectors — use a higher threshold (300 words) to
+    // avoid triggering on homepages/feeds that aggregate multiple short previews
     const SELECTORS = [
       'article',
-      'main',
-      '[role="main"]',
+      '[role="article"]',
       '.post-content',
       '.article-body',
       '.entry-content',
-      '.content',
     ];
     for (const sel of SELECTORS) {
       const el = document.querySelector(sel);
-      if (el && el.innerText.trim().length > 200) return el.innerText.trim();
+      const text = el?.innerText?.trim() ?? '';
+      if (text.split(/\s+/).length >= 300) return text;
     }
 
     return '';
@@ -148,6 +149,9 @@
     speaking: false,
     paused: false,
     watchdog: null,
+    rate: 1.0,
+    chunkStartTime: 0, // Date.now() when current chunk began, for real-time progress
+    ticker: null,      // setInterval handle for live progress updates
   };
 
   // ─── TIME PROGRESS HELPERS ───────────────────────────────────────────────────
@@ -170,7 +174,7 @@
   const host = document.createElement('div');
   host.id = 'ra-host';
   // Ensure nothing on the page can accidentally style our host element
-  host.style.cssText = 'all: initial; position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 2147483647;';
+  host.style.cssText = 'all: initial; position: fixed; bottom: 20px; right: 20px; z-index: 2147483647;';
   document.body.appendChild(host);
 
   const shadow = host.attachShadow({ mode: 'open' });
@@ -291,6 +295,18 @@
       /* Stop — purple */
       #btn-stop { background: linear-gradient(135deg, #e040fb, #aa00ff); color: #fff; font-size: 12px; }
 
+      /* Speed — yellow-pink, pill shaped */
+      #btn-speed {
+        background: linear-gradient(135deg, #ffd6ec, #ffb3d9);
+        color: #c026d3;
+        border-radius: 999px;
+        width: auto;
+        padding: 0 10px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+      }
+
       /* Close — small, top-right */
       #btn-close {
         background: #f3e8ff;
@@ -359,6 +375,7 @@
       <div id="player-controls">
         <button id="btn-play" title="Play · Alt+Shift+R">▶</button>
         <button id="btn-stop" title="Stop">■</button>
+        <button id="btn-speed" title="Change speed">1×</button>
         <span id="progress">${hasContent ? `0:00 / ${secsToMMSS(totalSecs())}` : 'Too short!'}</span>
       </div>
 
@@ -384,11 +401,13 @@
   const player     = shadow.getElementById('player');
   const btnPlay    = shadow.getElementById('btn-play');
   const btnStop    = shadow.getElementById('btn-stop');
+  const btnSpeed   = shadow.getElementById('btn-speed');
   const progress   = shadow.getElementById('progress');
 
   if (!hasContent) {
     btnPlay.disabled = true;
     btnStop.disabled = true;
+    btnSpeed.disabled = true;
   }
 
   // Toggle badge ↔ player
@@ -408,7 +427,22 @@
 
   function updateProgress() {
     if (!hasContent) return;
-    progress.textContent = `${secsToMMSS(elapsedSecs(tts.index))} / ${secsToMMSS(totalSecs())}`;
+    // Add real-time offset within the current chunk so display ticks smoothly
+    const liveOffset = tts.speaking && !tts.paused && tts.chunkStartTime
+      ? (Date.now() - tts.chunkStartTime) / 1000 / tts.rate
+      : 0;
+    const elapsed = Math.min(elapsedSecs(tts.index) + liveOffset, totalSecs());
+    progress.textContent = `${secsToMMSS(elapsed)} / ${secsToMMSS(totalSecs())}`;
+  }
+
+  function startTicker() {
+    clearInterval(tts.ticker);
+    tts.ticker = setInterval(updateProgress, 500);
+  }
+
+  function stopTicker() {
+    clearInterval(tts.ticker);
+    tts.ticker = null;
   }
 
   function resetWatchdog() {
@@ -428,7 +462,9 @@
     tts.speaking = false;
     tts.paused = false;
     tts.index = 0;
+    tts.chunkStartTime = 0;
     clearTimeout(tts.watchdog);
+    stopTicker();
     btnPlay.textContent = '▶';
     updateProgress();
   }
@@ -442,8 +478,9 @@
     tts.index = index;
     updateProgress();
 
+    tts.chunkStartTime = Date.now();
     const u = new SpeechSynthesisUtterance(tts.chunks[index]);
-    u.rate = 1.0;
+    u.rate = tts.rate;
     // Use the page's declared language so foreign-language articles sound correct
     u.lang = pageLang;
 
@@ -470,22 +507,27 @@
     tts.paused = false;
     btnPlay.textContent = '⏸';
     speakChunk(tts.index);
+    startTicker();
   }
 
   function pauseReading() {
     tts.paused = true;
     tts.speaking = false;
     clearTimeout(tts.watchdog);
+    stopTicker();
     synth.pause();
     btnPlay.textContent = '▶';
+    updateProgress();
   }
 
   function resumeReading() {
     tts.paused = false;
     tts.speaking = true;
+    tts.chunkStartTime = Date.now(); // reset timer for resumed chunk
     synth.resume();
     btnPlay.textContent = '⏸';
     resetWatchdog();
+    startTicker();
   }
 
   function stopReading() {
@@ -493,7 +535,9 @@
     tts.speaking = false;
     tts.paused = false;
     tts.index = 0;
+    tts.chunkStartTime = 0;
     clearTimeout(tts.watchdog);
+    stopTicker();
     btnPlay.textContent = '▶';
     updateProgress();
   }
@@ -506,6 +550,19 @@
   });
 
   shadow.getElementById('btn-stop').addEventListener('click', stopReading);
+
+  // Speed button: cycles 1× → 1.5× → 2× → 0.75× → 1×
+  const SPEEDS = [1.0, 1.5, 2.0, 0.75];
+  btnSpeed.addEventListener('click', () => {
+    const next = SPEEDS[(SPEEDS.indexOf(tts.rate) + 1) % SPEEDS.length];
+    tts.rate = next;
+    btnSpeed.textContent = `${next}×`;
+    // If already speaking, restart current chunk at new rate
+    if (tts.speaking && !tts.paused) {
+      synth.cancel();
+      speakChunk(tts.index);
+    }
+  });
 
   // Keyboard shortcut: Alt+Shift+R to toggle play/pause
   document.addEventListener('keydown', (e) => {
