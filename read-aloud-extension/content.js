@@ -66,14 +66,32 @@
     return mins < 1 ? '< 1 min read' : `${mins} min read`;
   }
 
-  // ─── 4. RUN EXTRACTION ───────────────────────────────────────────────────────
-  const articleText = extractText();
-  const wordCount = articleText.trim().split(/\s+/).length;
-  const hasContent = articleText.length > 0 && wordCount >= 100;
-  const tooShort = articleText.length > 0 && wordCount < 100;
+  // ─── 4. RUN EXTRACTION (with retry for dynamic sites like Substack) ──────────
+  let uiCreated = false;
 
-  // Nothing to show on dashboards, login pages, YouTube, etc.
-  if (!hasContent && !tooShort) return;
+  function tryInit() {
+    if (uiCreated) return true;
+    const articleText = extractText();
+    const wordCount = articleText.trim().split(/\s+/).length;
+    const hasContent = articleText.length > 0 && wordCount >= 100;
+    const tooShort = articleText.length > 0 && wordCount < 100;
+    if (!hasContent && !tooShort) return false;
+    uiCreated = true;
+    setupUI(articleText, hasContent);
+    return true;
+  }
+
+  // Try immediately; if content isn't ready yet, retry every second for up to 10s
+  if (!tryInit()) {
+    let attempts = 0;
+    const retryTimer = setInterval(() => {
+      attempts++;
+      if (tryInit() || attempts >= 10) clearInterval(retryTimer);
+    }, 1000);
+  }
+
+  function setupUI(articleText, hasContent) {
+    const wordCount = articleText.trim().split(/\s+/).length;
 
   // ─── 5. TTS STATE ────────────────────────────────────────────────────────────
   const tts = {
@@ -474,4 +492,6 @@
     observer.disconnect();
     observerActive = false;
   }, 30000);
+  } // end setupUI
+
 })();
