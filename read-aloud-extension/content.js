@@ -99,7 +99,7 @@
       let attempts = 0;
       retryTimer = setInterval(() => {
         attempts++;
-        if (tryInit() || attempts >= 10) clearInterval(retryTimer);
+        if (tryInit() || attempts >= 20) clearInterval(retryTimer);
       }, 1000);
     }
   }
@@ -122,8 +122,8 @@
     if (existing) existing.remove();
     uiCreated = false;
 
-    // Wait briefly for new page content to start rendering, then try init
-    setTimeout(runInitWithRetry, 500);
+    // Wait for Substack/Next.js to clear old DOM and start rendering new content
+    setTimeout(runInitWithRetry, 1000);
   }
 
   // Intercept pushState and replaceState (used by React Router, Next.js, etc.)
