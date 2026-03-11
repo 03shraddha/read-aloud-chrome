@@ -150,11 +150,27 @@
     watchdog: null,
   };
 
+  // ─── TIME PROGRESS HELPERS ───────────────────────────────────────────────────
+  // Estimate seconds for a chunk based on word count at 150 wpm (TTS rate 1.0)
+  const chunkDurations = tts.chunks.map(c => (c.trim().split(/\s+/).length / 150) * 60);
+
+  function secsToMMSS(s) {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  }
+
+  function totalSecs() { return chunkDurations.reduce((a, b) => a + b, 0); }
+
+  function elapsedSecs(index) {
+    return chunkDurations.slice(0, index).reduce((a, b) => a + b, 0);
+  }
+
   // ─── BUILD UI (Shadow DOM for CSS isolation) ──────────────────────────────────
   const host = document.createElement('div');
   host.id = 'ra-host';
   // Ensure nothing on the page can accidentally style our host element
-  host.style.cssText = 'all: initial; position: fixed; bottom: 20px; right: 20px; z-index: 2147483647;';
+  host.style.cssText = 'all: initial; position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 2147483647;';
   document.body.appendChild(host);
 
   const shadow = host.attachShadow({ mode: 'open' });
@@ -181,30 +197,26 @@
         display: inline-flex;
         align-items: center;
         gap: 7px;
-        background: #FF2D87;
-        color: #FFE500;
+        background: linear-gradient(135deg, #ff6eb4, #ff2d87);
+        color: #fff;
         padding: 9px 18px 9px 14px;
         border-radius: 999px;
-        border: 3px solid #0D0D0D;
-        box-shadow: 4px 4px 0 #0D0D0D;
+        box-shadow: 0 4px 16px rgba(255,45,135,0.45);
         font-family: 'Fredoka One', 'Arial Black', Impact, sans-serif;
         font-size: 14px;
         letter-spacing: 0.3px;
         cursor: pointer;
         user-select: none;
         white-space: nowrap;
-        transition: transform 0.1s, box-shadow 0.1s;
-        /* chunky text outline */
-        text-shadow: 1px 1px 0 #0D0D0D, -1px -1px 0 #0D0D0D,
-                     1px -1px 0 #0D0D0D, -1px 1px 0 #0D0D0D;
+        transition: transform 0.15s, box-shadow 0.15s;
       }
       #badge:hover {
-        transform: translate(-2px, -2px);
-        box-shadow: 6px 6px 0 #0D0D0D;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(255,45,135,0.55);
       }
       #badge:active {
-        transform: translate(2px, 2px);
-        box-shadow: 2px 2px 0 #0D0D0D;
+        transform: translateY(1px);
+        box-shadow: 0 2px 8px rgba(255,45,135,0.35);
       }
 
       /* ── Player card (expanded state) ───────────────── */
@@ -212,10 +224,9 @@
         display: none;
         flex-direction: column;
         gap: 0;
-        background: #FFFDF0;
-        border: 3px solid #0D0D0D;
-        border-radius: 18px;
-        box-shadow: 6px 6px 0 #0D0D0D;
+        background: #fff8fd;
+        border-radius: 20px;
+        box-shadow: 0 8px 32px rgba(200,0,180,0.18), 0 2px 8px rgba(0,0,0,0.08);
         min-width: 260px;
         overflow: hidden;
         position: relative;
@@ -239,7 +250,7 @@
       #player-title {
         font-family: 'Fredoka One', 'Arial Black', Impact, sans-serif;
         font-size: 13px;
-        color: #0D0D0D;
+        color: #c026d3;
         letter-spacing: 0.4px;
         display: flex;
         align-items: center;
@@ -256,7 +267,7 @@
 
       /* ── Buttons ─────────────────────────────────────── */
       button {
-        border: 2.5px solid #0D0D0D;
+        border: none;
         border-radius: 50%;
         width: 36px;
         height: 36px;
@@ -267,38 +278,37 @@
         justify-content: center;
         flex-shrink: 0;
         font-family: 'Fredoka One', 'Arial Black', sans-serif;
-        transition: transform 0.1s, box-shadow 0.1s;
-        box-shadow: 3px 3px 0 #0D0D0D;
+        transition: transform 0.15s, box-shadow 0.15s;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.15);
       }
-      button:hover  { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 #0D0D0D; }
-      button:active { transform: translate(1px,1px);   box-shadow: 1px 1px 0 #0D0D0D; }
-      button:disabled { opacity: 0.3; cursor: not-allowed; transform: none; box-shadow: 3px 3px 0 #0D0D0D; }
+      button:hover  { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.18); }
+      button:active { transform: translateY(1px);  box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+      button:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
 
       /* Play/pause — cyan */
-      #btn-play { background: #00E5FF; color: #0D0D0D; font-size: 15px; }
+      #btn-play { background: linear-gradient(135deg, #00E5FF, #00b8d9); color: #fff; font-size: 15px; }
 
       /* Stop — purple */
-      #btn-stop { background: #CC00FF; color: #fff; font-size: 12px; }
+      #btn-stop { background: linear-gradient(135deg, #e040fb, #aa00ff); color: #fff; font-size: 12px; }
 
       /* Close — small, top-right */
       #btn-close {
-        background: #FFE500;
-        color: #0D0D0D;
-        border: 2px solid #0D0D0D;
+        background: #f3e8ff;
+        color: #9c27b0;
         border-radius: 50%;
         width: 24px;
         height: 24px;
-        font-size: 12px;
-        box-shadow: 2px 2px 0 #0D0D0D;
+        font-size: 11px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
       }
-      #btn-close:hover { background: #FF2D87; color: #fff; }
+      #btn-close:hover { background: #ff6eb4; color: #fff; }
 
       /* ── Progress label ──────────────────────────────── */
       #progress {
         flex: 1;
         font-family: 'Fredoka One', 'Arial Black', sans-serif;
         font-size: 12px;
-        color: #555;
+        color: #a855f7;
         text-align: center;
         letter-spacing: 0.5px;
       }
@@ -318,9 +328,9 @@
     <div id="badge">
       <!-- Headphone icon -->
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M3 18v-6a9 9 0 0118 0v6" stroke="#FFE500" stroke-width="2.5" stroke-linecap="round"/>
-        <rect x="1" y="16" width="4" height="6" rx="2" fill="#FFE500" stroke="#0D0D0D" stroke-width="1.5"/>
-        <rect x="19" y="16" width="4" height="6" rx="2" fill="#FFE500" stroke="#0D0D0D" stroke-width="1.5"/>
+        <path d="M3 18v-6a9 9 0 0118 0v6" stroke="rgba(255,255,255,0.9)" stroke-width="2.5" stroke-linecap="round"/>
+        <rect x="1" y="16" width="4" height="6" rx="2" fill="rgba(255,255,255,0.9)"/>
+        <rect x="19" y="16" width="4" height="6" rx="2" fill="rgba(255,255,255,0.9)"/>
       </svg>
       <span id="badge-label">${hasContent ? readingTime(articleText) : '< 1 min read'}</span>
     </div>
@@ -335,10 +345,10 @@
         <span id="player-title">
           <!-- Cassette icon -->
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <rect x="2" y="5" width="20" height="14" rx="3" fill="#FFE500" stroke="#0D0D0D" stroke-width="2"/>
-            <circle cx="8"  cy="12" r="2.5" fill="#0D0D0D"/>
-            <circle cx="16" cy="12" r="2.5" fill="#0D0D0D"/>
-            <rect x="8" y="15" width="8" height="2.5" rx="1" fill="#0D0D0D"/>
+            <rect x="2" y="5" width="20" height="14" rx="3" fill="#f0abfc"/>
+            <circle cx="8"  cy="12" r="2.5" fill="#c026d3"/>
+            <circle cx="16" cy="12" r="2.5" fill="#c026d3"/>
+            <rect x="8" y="15" width="8" height="2.5" rx="1" fill="#c026d3"/>
           </svg>
           READ ALOUD
         </span>
@@ -349,17 +359,17 @@
       <div id="player-controls">
         <button id="btn-play" title="Play · Alt+Shift+R">▶</button>
         <button id="btn-stop" title="Stop">■</button>
-        <span id="progress">${hasContent ? `0 / ${tts.chunks.length}` : 'Too short!'}</span>
+        <span id="progress">${hasContent ? `0:00 / ${secsToMMSS(totalSecs())}` : 'Too short!'}</span>
       </div>
 
       <!-- Decorative shapes -->
       <svg id="deco-star" class="deco" width="18" height="18" viewBox="0 0 24 24">
         <polygon points="12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9"
-          fill="#FF2D87" stroke="#0D0D0D" stroke-width="1.5" stroke-linejoin="round"/>
+          fill="#f9a8d4"/>
       </svg>
       <svg id="deco-tri" class="deco" width="14" height="14" viewBox="0 0 24 24">
         <polygon points="12,3 22,21 2,21"
-          fill="#00E5FF" stroke="#0D0D0D" stroke-width="2" stroke-linejoin="round"/>
+          fill="#a5f3fc"/>
       </svg>
       <svg id="deco-squig" class="deco" width="18" height="28" viewBox="0 0 18 28">
         <path d="M9 2 C14 6, 4 10, 9 14 C14 18, 4 22, 9 26"
@@ -397,7 +407,8 @@
   const synth = window.speechSynthesis;
 
   function updateProgress() {
-    progress.textContent = `${tts.index} / ${tts.chunks.length}`;
+    if (!hasContent) return;
+    progress.textContent = `${secsToMMSS(elapsedSecs(tts.index))} / ${secsToMMSS(totalSecs())}`;
   }
 
   function resetWatchdog() {
@@ -537,6 +548,9 @@
       if (newWords > initialWordCount * 1.2 && !tts.speaking && newWords >= 100) {
         tts.chunks = buildChunks(newText);
         tts.index = 0;
+        // Recompute time estimates for new content
+        chunkDurations.length = 0;
+        tts.chunks.forEach(c => chunkDurations.push((c.trim().split(/\s+/).length / 150) * 60));
         // Update only the text label — preserve the SVG icon inside the badge
         badgeLabel.textContent = readingTime(newText);
         btnPlay.disabled = false;
