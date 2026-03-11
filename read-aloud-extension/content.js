@@ -1,13 +1,17 @@
 (() => {
-  // ─── GUARD: skip PDFs and frames ─────────────────────────────────────────────
+  // ─── GUARD: skip PDFs, frames, no-body pages, no-TTS environments ────────────
   if (document.contentType === 'application/pdf') return;
   if (window.location.pathname.endsWith('.pdf')) return;
+  if (!document.body) return;
+  if (!window.speechSynthesis) return;
 
   // ─── 1. EXTRACT READABLE TEXT ────────────────────────────────────────────────
   function extractText() {
     // Primary: Mozilla Readability (handles Medium, Substack, dynamic class names)
     try {
       const docClone = document.cloneNode(true);
+      // Strip code blocks — they sound terrible when read aloud
+      docClone.querySelectorAll('pre, code').forEach(el => el.remove());
       const article = new Readability(docClone).parse(); // eslint-disable-line no-undef
       if (article?.textContent?.trim().length > 200) {
         return article.textContent.trim();
@@ -66,34 +70,78 @@
     return mins < 1 ? '< 1 min read' : `${mins} min read`;
   }
 
-  // ─── 4. RUN EXTRACTION (with retry for dynamic sites like Substack) ──────────
+  // ─── 4. STATE ────────────────────────────────────────────────────────────────
   let uiCreated = false;
+  let lastUrl = location.href;
+  let retryTimer = null; // tracked so we can cancel on SPA navigation
 
+  // ─── 5. INIT WITH RETRY ──────────────────────────────────────────────────────
   function tryInit() {
     if (uiCreated) return true;
+    if (!document.body) return false;
+
     const articleText = extractText();
     const wordCount = articleText.trim().split(/\s+/).length;
     const hasContent = articleText.length > 0 && wordCount >= 100;
     const tooShort = articleText.length > 0 && wordCount < 100;
+
     if (!hasContent && !tooShort) return false;
+
     uiCreated = true;
     setupUI(articleText, hasContent);
     return true;
   }
 
-  // Try immediately; if content isn't ready yet, retry every second for up to 10s
-  if (!tryInit()) {
-    let attempts = 0;
-    const retryTimer = setInterval(() => {
-      attempts++;
-      if (tryInit() || attempts >= 10) clearInterval(retryTimer);
-    }, 1000);
+  function runInitWithRetry() {
+    clearInterval(retryTimer); // cancel any previous pending retry loop
+    if (!tryInit()) {
+      let attempts = 0;
+      retryTimer = setInterval(() => {
+        attempts++;
+        if (tryInit() || attempts >= 10) clearInterval(retryTimer);
+      }, 1000);
+    }
   }
 
+  runInitWithRetry();
+
+  // ─── 6. SPA NAVIGATION DETECTION ─────────────────────────────────────────────
+  // React, Next.js, Substack, Medium navigate via history API without page reload.
+  // Detect URL changes, tear down old UI, and re-initialise for the new article.
+  function onUrlChange() {
+    const newUrl = location.href;
+    if (newUrl === lastUrl) return;
+    lastUrl = newUrl;
+
+    // Stop any active speech before tearing down
+    window.speechSynthesis.cancel();
+
+    // Remove old badge/player
+    const existing = document.getElementById('ra-host');
+    if (existing) existing.remove();
+    uiCreated = false;
+
+    // Wait briefly for new page content to start rendering, then try init
+    setTimeout(runInitWithRetry, 500);
+  }
+
+  // Intercept pushState and replaceState (used by React Router, Next.js, etc.)
+  ['pushState', 'replaceState'].forEach(method => {
+    const orig = history[method];
+    history[method] = function (...args) {
+      orig.apply(this, args);
+      onUrlChange();
+    };
+  });
+  window.addEventListener('popstate', onUrlChange);
+
+  // ─── 7. SETUP UI ─────────────────────────────────────────────────────────────
   function setupUI(articleText, hasContent) {
     const wordCount = articleText.trim().split(/\s+/).length;
+    // Use the page's declared language for TTS voice matching
+    const pageLang = document.documentElement.lang || 'en-US';
 
-  // ─── 5. TTS STATE ────────────────────────────────────────────────────────────
+  // ─── TTS STATE ───────────────────────────────────────────────────────────────
   const tts = {
     chunks: hasContent ? buildChunks(articleText) : [],
     index: 0,
@@ -102,7 +150,7 @@
     watchdog: null,
   };
 
-  // ─── 6. BUILD UI (Shadow DOM for CSS isolation) ───────────────────────────────
+  // ─── BUILD UI (Shadow DOM for CSS isolation) ──────────────────────────────────
   const host = document.createElement('div');
   host.id = 'ra-host';
   // Ensure nothing on the page can accidentally style our host element
@@ -274,7 +322,7 @@
         <rect x="1" y="16" width="4" height="6" rx="2" fill="#FFE500" stroke="#0D0D0D" stroke-width="1.5"/>
         <rect x="19" y="16" width="4" height="6" rx="2" fill="#FFE500" stroke="#0D0D0D" stroke-width="1.5"/>
       </svg>
-      ${hasContent ? readingTime(articleText) : '< 1 min read'}
+      <span id="badge-label">${hasContent ? readingTime(articleText) : '< 1 min read'}</span>
     </div>
 
     <!-- Expanded player card -->
@@ -320,12 +368,13 @@
     </div>
   `;
 
-  // ─── 7. DOM REFERENCES ───────────────────────────────────────────────────────
-  const badge    = shadow.getElementById('badge');
-  const player   = shadow.getElementById('player');
-  const btnPlay  = shadow.getElementById('btn-play');
-  const btnStop  = shadow.getElementById('btn-stop');
-  const progress = shadow.getElementById('progress');
+  // ─── DOM REFERENCES ───────────────────────────────────────────────────────────
+  const badge      = shadow.getElementById('badge');
+  const badgeLabel = shadow.getElementById('badge-label');
+  const player     = shadow.getElementById('player');
+  const btnPlay    = shadow.getElementById('btn-play');
+  const btnStop    = shadow.getElementById('btn-stop');
+  const progress   = shadow.getElementById('progress');
 
   if (!hasContent) {
     btnPlay.disabled = true;
@@ -344,7 +393,7 @@
     // NOTE: audio keeps playing if user closes the bar — intentional UX
   });
 
-  // ─── 8. TTS ENGINE ───────────────────────────────────────────────────────────
+  // ─── TTS ENGINE ───────────────────────────────────────────────────────────────
   const synth = window.speechSynthesis;
 
   function updateProgress() {
@@ -384,7 +433,8 @@
 
     const u = new SpeechSynthesisUtterance(tts.chunks[index]);
     u.rate = 1.0;
-    u.lang = 'en-US';
+    // Use the page's declared language so foreign-language articles sound correct
+    u.lang = pageLang;
 
     u.onend = () => {
       clearTimeout(tts.watchdog);
@@ -437,11 +487,11 @@
     updateProgress();
   }
 
-  // ─── 9. BUTTON HANDLERS ──────────────────────────────────────────────────────
+  // ─── BUTTON HANDLERS ──────────────────────────────────────────────────────────
   btnPlay.addEventListener('click', () => {
-    if (!tts.speaking && !tts.paused) startReading();   // fresh start
+    if (!tts.speaking && !tts.paused) startReading();    // fresh start
     else if (tts.speaking && !tts.paused) pauseReading(); // pause
-    else if (tts.paused) resumeReading();               // resume
+    else if (tts.paused) resumeReading();                // resume
   });
 
   shadow.getElementById('btn-stop').addEventListener('click', stopReading);
@@ -455,15 +505,24 @@
     }
   });
 
-  // Clean up on navigation
+  // Tab visibility: Chrome TTS silently dies when a tab is backgrounded.
+  // When the tab becomes visible again and speech was active, restart from current chunk.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && tts.speaking && !tts.paused) {
+      synth.cancel();
+      setTimeout(() => speakChunk(tts.index), 100);
+    }
+  });
+
+  // Clean up on full page navigation
   window.addEventListener('beforeunload', () => {
     synth.cancel();
     clearTimeout(tts.watchdog);
   });
 
-  // ─── 10. SPA SUPPORT (MutationObserver) ──────────────────────────────────────
-  // Some sites (Medium, Substack) navigate without a full page reload.
-  // Watch for large DOM changes and re-extract if content grows significantly.
+  // ─── CONTENT GROWTH OBSERVER ─────────────────────────────────────────────────
+  // Watch for lazy-loaded content growing after initial render (e.g. infinite scroll,
+  // paywalled articles revealing content, slow API responses).
   let debounceTimer = null;
   let observerActive = true;
   const initialWordCount = wordCount;
@@ -478,7 +537,8 @@
       if (newWords > initialWordCount * 1.2 && !tts.speaking && newWords >= 100) {
         tts.chunks = buildChunks(newText);
         tts.index = 0;
-        badge.textContent = `⏱ ${readingTime(newText)}`;
+        // Update only the text label — preserve the SVG icon inside the badge
+        badgeLabel.textContent = readingTime(newText);
         btnPlay.disabled = false;
         btnStop.disabled = false;
         updateProgress();
