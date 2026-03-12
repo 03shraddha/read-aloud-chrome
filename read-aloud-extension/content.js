@@ -1,12 +1,18 @@
 (() => {
-  // ─── GUARD: skip PDFs, frames, no-body pages, no-TTS environments ────────────
-  if (document.contentType === 'application/pdf') return;
-  if (window.location.pathname.endsWith('.pdf')) return;
+  // ─── GUARD: skip frames, no-body pages, no-TTS environments ─────────────────
   if (!document.body) return;
   if (!window.speechSynthesis) return;
 
   // ─── 1. EXTRACT READABLE TEXT ────────────────────────────────────────────────
   function extractText() {
+    // PDF.js rendered documents — text lives in .textLayer <span> elements.
+    // Must check before Readability since PDF.js pages have no article title.
+    const pdfSpans = document.querySelectorAll('.textLayer span');
+    if (pdfSpans.length > 0) {
+      const text = [...pdfSpans].map(s => s.textContent).join(' ').replace(/\s+/g, ' ').trim();
+      if (text.length > 50) return text;
+    }
+
     // Primary: Mozilla Readability — requires both a title and substantial body
     // so homepages/feeds (no article title) are correctly excluded
     try {
@@ -21,8 +27,7 @@
       // Readability failed, fall through to selector strategy
     }
 
-    // Fallback: semantic selectors — use a higher threshold (300 words) to
-    // avoid triggering on homepages/feeds that aggregate multiple short previews
+    // Fallback: semantic selectors
     const SELECTORS = [
       'article',
       '[role="article"]',
@@ -33,7 +38,7 @@
     for (const sel of SELECTORS) {
       const el = document.querySelector(sel);
       const text = el?.innerText?.trim() ?? '';
-      if (text.split(/\s+/).length >= 300) return text;
+      if (text.split(/\s+/).length >= 50) return text;
     }
 
     return '';
@@ -83,8 +88,8 @@
 
     const articleText = extractText();
     const wordCount = articleText.trim().split(/\s+/).length;
-    const hasContent = articleText.length > 0 && wordCount >= 100;
-    const tooShort = articleText.length > 0 && wordCount < 100;
+    const hasContent = articleText.length > 0 && wordCount >= 20;
+    const tooShort = articleText.length > 0 && wordCount < 20;
 
     if (!hasContent && !tooShort) return false;
 
