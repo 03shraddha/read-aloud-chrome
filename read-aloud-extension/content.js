@@ -277,19 +277,41 @@
 
       /* ── Scrubber ────────────────────────────────────── */
       #scrubber-track {
-        height: 3px;
+        height: 4px;
         background: #e5e5ea;
         border-radius: 99px;
         margin-bottom: 6px;
-        overflow: hidden;
+        cursor: pointer;
+        position: relative;
+        /* Expand hit area without changing visual size */
+        padding: 8px 0;
+        margin-top: -8px;
+        margin-bottom: -2px;
       }
       #scrubber-fill {
-        height: 100%;
+        height: 4px;
         width: 0%;
         background: #ff375f;
         border-radius: 99px;
         transition: width 0.5s linear;
+        position: relative;
+        pointer-events: none;
       }
+      #scrubber-thumb {
+        position: absolute;
+        right: -5px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #ff375f;
+        opacity: 0;
+        transition: opacity 0.15s;
+        pointer-events: none;
+      }
+      #scrubber-track:hover #scrubber-thumb { opacity: 1; }
+      #scrubber-track:hover #scrubber-fill { transition: none; }
 
       /* Time labels */
       #progress-times {
@@ -382,7 +404,9 @@
 
       <!-- Scrubber -->
       <div id="scrubber-track">
-        <div id="scrubber-fill"></div>
+        <div id="scrubber-fill">
+          <div id="scrubber-thumb"></div>
+        </div>
       </div>
       <div id="progress-times">
         <span id="time-elapsed">0:00</span>
@@ -419,6 +443,7 @@
     synth.cancel();
     clearTimeout(tts.watchdog);
     stopTicker();
+    if (document.getElementById('ra-sel-host')) document.getElementById('ra-sel-host').remove();
     host.remove();
   });
 
@@ -471,6 +496,21 @@
     }, 14000);
   }
 
+  // Saved article chunks — set when reading a selection so we can restore after
+  let savedChunks = null;
+  let savedChunkDurations = null;
+
+  function restoreArticleChunks() {
+    if (!savedChunks) return;
+    tts.chunks.length = 0;
+    savedChunks.forEach(c => tts.chunks.push(c));
+    chunkDurations.length = 0;
+    savedChunkDurations.forEach(d => chunkDurations.push(d));
+    savedChunks = null;
+    savedChunkDurations = null;
+    shadow.getElementById('time-total').textContent = secsToMMSS(totalSecs());
+  }
+
   function onFinished() {
     tts.speaking = false;
     tts.paused = false;
@@ -479,6 +519,7 @@
     clearTimeout(tts.watchdog);
     stopTicker();
     btnPlay.textContent = '▶';
+    restoreArticleChunks(); // restore article if we were reading a selection
     updateProgress();
   }
 
@@ -543,16 +584,40 @@
     startTicker();
   }
 
-  function stopReading() {
+  // ─── SCRUBBER SEEK ────────────────────────────────────────────────────────────
+  function seekToRatio(ratio) {
+    if (!hasContent || tts.chunks.length === 0) return;
+    const targetSecs = Math.max(0, Math.min(1, ratio)) * totalSecs();
+
+    // Find the chunk index at this time position
+    let acc = 0, idx = chunkDurations.length - 1;
+    for (let i = 0; i < chunkDurations.length; i++) {
+      if (acc + chunkDurations[i] > targetSecs) { idx = i; break; }
+      acc += chunkDurations[i];
+    }
+
+    const wasPlaying = tts.speaking && !tts.paused;
     synth.cancel();
-    tts.speaking = false;
-    tts.paused = false;
-    tts.index = 0;
-    tts.chunkStartTime = 0;
     clearTimeout(tts.watchdog);
     stopTicker();
-    btnPlay.textContent = '▶';
+    tts.index = idx;
+    tts.chunkStartTime = 0;
+    tts.speaking = false;
+    tts.paused = false;
+
+    // Jump scrubber immediately (no transition lag)
+    scrubberFill.style.transition = 'none';
     updateProgress();
+    requestAnimationFrame(() => { scrubberFill.style.transition = ''; });
+
+    if (wasPlaying) {
+      tts.speaking = true;
+      btnPlay.textContent = '⏸';
+      speakChunk(idx);
+      startTicker();
+    } else {
+      btnPlay.textContent = '▶';
+    }
   }
 
   // ─── BUTTON HANDLERS ──────────────────────────────────────────────────────────
@@ -567,20 +632,25 @@
     synth.cancel();
     clearTimeout(tts.watchdog);
     stopTicker();
+    const selHost = document.getElementById('ra-sel-host');
+    if (selHost) selHost.remove();
     host.remove();
   });
 
+  // Scrubber click → seek to that position
+  shadow.getElementById('scrubber-track').addEventListener('click', (e) => {
+    const track = e.currentTarget;
+    const rect = track.getBoundingClientRect();
+    seekToRatio((e.clientX - rect.left) / rect.width);
+  });
+
   // Speed button: cycles 1× → 1.5× → 2× → 0.75× → 1×
+  // Rate applies from the next chunk — no restart of current chunk
   const SPEEDS = [1.0, 1.5, 2.0, 0.75];
   btnSpeed.addEventListener('click', () => {
     const next = SPEEDS[(SPEEDS.indexOf(tts.rate) + 1) % SPEEDS.length];
     tts.rate = next;
     btnSpeed.textContent = `${next}×`;
-    // If already speaking, restart current chunk at new rate
-    if (tts.speaking && !tts.paused) {
-      synth.cancel();
-      speakChunk(tts.index);
-    }
   });
 
   // Keyboard shortcut: Alt+Shift+R to toggle play/pause
@@ -605,6 +675,93 @@
   window.addEventListener('beforeunload', () => {
     synth.cancel();
     clearTimeout(tts.watchdog);
+  });
+
+  // ─── SELECTION READING ───────────────────────────────────────────────────────
+  // Shows a small floating button when the user selects text.
+  // Clicking it reads just the selected portion; article resumes after.
+  const selHost = document.createElement('div');
+  selHost.id = 'ra-sel-host';
+  selHost.style.cssText = 'all: initial; position: fixed; z-index: 2147483646; pointer-events: none;';
+  document.body.appendChild(selHost);
+
+  const selShadow = selHost.attachShadow({ mode: 'open' });
+  selShadow.innerHTML = `
+    <style>
+      #sel-btn {
+        display: none; align-items: center; gap: 5px;
+        background: #ff375f; color: #fff; border: none; border-radius: 16px;
+        padding: 5px 12px 5px 9px;
+        font-family: -apple-system, 'Helvetica Neue', sans-serif;
+        font-size: 12px; font-weight: 600; cursor: pointer;
+        pointer-events: all;
+        box-shadow: 0 2px 12px rgba(255,55,95,0.35);
+        white-space: nowrap; user-select: none; transition: transform 0.15s;
+      }
+      #sel-btn.visible { display: inline-flex; }
+      #sel-btn:hover  { transform: scale(1.04); }
+      #sel-btn:active { transform: scale(0.96); }
+    </style>
+    <button id="sel-btn">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
+        <path d="M3 18v-6a9 9 0 0118 0v6" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+        <rect x="1" y="16" width="4" height="6" rx="2" fill="#fff"/>
+        <rect x="19" y="16" width="4" height="6" rx="2" fill="#fff"/>
+      </svg>
+      Read selection
+    </button>
+  `;
+
+  const selBtn = selShadow.getElementById('sel-btn');
+  function hideSelBtn() { selBtn.classList.remove('visible'); }
+
+  document.addEventListener('mouseup', (e) => {
+    setTimeout(() => {
+      const text = window.getSelection()?.toString().trim() ?? '';
+      if (text.split(/\s+/).length >= 3) {
+        selHost.style.left = `${Math.min(e.clientX, window.innerWidth - 160)}px`;
+        selHost.style.top  = `${Math.max(e.clientY - 44, 8)}px`;
+        selBtn.classList.add('visible');
+      } else {
+        hideSelBtn();
+      }
+    }, 10);
+  });
+
+  document.addEventListener('mousedown', (e) => {
+    if (!e.composedPath().includes(selHost)) hideSelBtn();
+  });
+
+  selBtn.addEventListener('click', () => {
+    const text = window.getSelection()?.toString().trim() ?? '';
+    if (!text) return;
+    hideSelBtn();
+    window.getSelection().removeAllRanges();
+
+    // Save article chunks so we can restore them when selection finishes
+    if (!savedChunks) {
+      savedChunks = [...tts.chunks];
+      savedChunkDurations = [...chunkDurations];
+    }
+
+    // Swap in selected text as the chunks to read
+    const selChunks = buildChunks(text);
+    tts.chunks.length = 0; selChunks.forEach(c => tts.chunks.push(c));
+    chunkDurations.length = 0;
+    selChunks.forEach(c => chunkDurations.push((c.trim().split(/\s+/).length / 150) * 60));
+    tts.index = 0;
+    shadow.getElementById('time-total').textContent = secsToMMSS(totalSecs());
+    updateProgress();
+
+    // Open player and start reading
+    badge.style.display = 'none';
+    player.classList.add('visible');
+    synth.cancel();
+    tts.speaking = true;
+    tts.paused = false;
+    btnPlay.textContent = '⏸';
+    speakChunk(0);
+    startTicker();
   });
 
   // ─── CONTENT GROWTH OBSERVER ─────────────────────────────────────────────────
