@@ -76,12 +76,17 @@
     return mins < 1 ? '< 1 min read' : `${mins} min read`;
   }
 
-  // ─── 4. STATE ────────────────────────────────────────────────────────────────
+  // ─── 4. HTML ESCAPE ──────────────────────────────────────────────────────────
+  function escHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // ─── 5. STATE ────────────────────────────────────────────────────────────────
   let uiCreated = false;
   let lastUrl = location.href;
   let retryTimer = null; // tracked so we can cancel on SPA navigation
 
-  // ─── 5. INIT WITH RETRY ──────────────────────────────────────────────────────
+  // ─── 6. INIT WITH RETRY ──────────────────────────────────────────────────────
   function tryInit() {
     if (uiCreated) return true;
     if (!document.body) return false;
@@ -116,7 +121,7 @@
     if (msg.action === 'show') runInitWithRetry();
   });
 
-  // ─── 6. SPA NAVIGATION DETECTION ─────────────────────────────────────────────
+  // ─── 7. SPA NAVIGATION DETECTION ─────────────────────────────────────────────
   // React, Next.js, Substack, Medium navigate via history API without page reload.
   // Detect URL changes, tear down old UI, and re-initialise for the new article.
   function onUrlChange() {
@@ -146,7 +151,7 @@
   });
   window.addEventListener('popstate', onUrlChange);
 
-  // ─── 7. SETUP UI ─────────────────────────────────────────────────────────────
+  // ─── 8. SETUP UI ─────────────────────────────────────────────────────────────
   function setupUI(articleText, hasContent) {
     const wordCount = articleText.trim().split(/\s+/).length;
     // Use the page's declared language for TTS voice matching
@@ -183,7 +188,6 @@
   // ─── BUILD UI (Shadow DOM for CSS isolation) ──────────────────────────────────
   const host = document.createElement('div');
   host.id = 'ra-host';
-  // Ensure nothing on the page can accidentally style our host element
   host.style.cssText = 'all: initial; position: fixed; bottom: 20px; right: 20px; z-index: 2147483647;';
   document.body.appendChild(host);
 
@@ -196,202 +200,170 @@
 
       /* ── Badge ───────────────────────────────────────── */
       #badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
+        display: inline-flex; align-items: center; gap: 6px;
         background: rgba(255,255,255,0.92);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(0,0,0,0.08);
-        color: #1c1c1e;
-        padding: 6px 13px 6px 10px;
-        border-radius: 20px;
-        font-size: 13px;
-        font-weight: 500;
-        cursor: pointer;
-        user-select: none;
-        white-space: nowrap;
+        backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(0,0,0,0.08); color: #1c1c1e;
+        padding: 6px 13px 6px 10px; border-radius: 20px;
+        font-size: 13px; font-weight: 500; cursor: pointer;
+        user-select: none; white-space: nowrap;
         box-shadow: 0 2px 12px rgba(0,0,0,0.1);
         transition: box-shadow 0.2s, transform 0.2s;
       }
       #badge:hover  { transform: scale(1.02); box-shadow: 0 4px 20px rgba(0,0,0,0.14); }
       #badge:active { transform: scale(0.98); }
 
-      /* Dismiss ×  on the badge */
+      /* Dismiss × on the badge */
       #badge-dismiss {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: transparent;
-        color: #8e8e93;
-        font-size: 11px;
-        line-height: 1;
-        cursor: pointer;
-        flex-shrink: 0;
-        transition: color 0.15s, background 0.15s;
-        margin-left: 2px;
+        display: flex; align-items: center; justify-content: center;
+        width: 16px; height: 16px; border-radius: 50%;
+        background: transparent; color: #8e8e93; font-size: 11px;
+        line-height: 1; cursor: pointer; flex-shrink: 0;
+        transition: color 0.15s, background 0.15s; margin-left: 2px;
       }
       #badge-dismiss:hover { background: #e5e5ea; color: #3a3a3c; }
 
       /* ── Player card ─────────────────────────────────── */
       #player {
-        display: none;
-        flex-direction: column;
-        background: rgba(255,255,255,0.94);
-        backdrop-filter: blur(24px);
-        -webkit-backdrop-filter: blur(24px);
-        border: 1px solid rgba(0,0,0,0.08);
-        border-radius: 22px;
+        display: none; flex-direction: column;
+        background: rgba(255,255,255,0.96);
+        backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(0,0,0,0.08); border-radius: 22px;
         box-shadow: 0 8px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
-        width: 280px;
-        padding: 16px 16px 14px;
-        gap: 0;
+        width: 300px; padding: 16px 16px 14px; gap: 0;
       }
       #player.visible { display: flex; }
 
       /* Header row */
       #player-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 14px;
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 10px;
       }
       #player-title {
-        font-size: 12px;
-        font-weight: 600;
-        color: #8e8e93;
-        letter-spacing: 0.3px;
-        text-transform: uppercase;
+        font-size: 12px; font-weight: 600; color: #8e8e93;
+        letter-spacing: 0.3px; text-transform: uppercase;
       }
 
       /* Close button */
       #btn-close {
-        background: #e5e5ea;
-        border: none;
-        border-radius: 50%;
-        width: 22px;
-        height: 22px;
-        font-size: 11px;
-        color: #6c6c70;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: background 0.15s;
-        flex-shrink: 0;
+        background: #e5e5ea; border: none; border-radius: 50%;
+        width: 22px; height: 22px; font-size: 11px; color: #6c6c70;
+        cursor: pointer; display: flex; align-items: center;
+        justify-content: center; transition: background 0.15s; flex-shrink: 0;
       }
       #btn-close:hover { background: #d1d1d6; }
 
+      /* ── Voice selector ──────────────────────────────── */
+      #voice-select {
+        width: 100%; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px;
+        padding: 5px 8px; font-size: 11px; color: #3a3a3c;
+        background: #f2f2f7; cursor: pointer; margin-bottom: 10px;
+        outline: none; font-family: inherit; appearance: none;
+        -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238e8e93' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat; background-position: right 8px center;
+        padding-right: 24px;
+      }
+      #voice-select:focus { border-color: #ff375f; }
+
+      /* ── Sentence display with word highlight ─────────── */
+      #sentence-display {
+        font-size: 12px; line-height: 1.55; color: #3a3a3c;
+        background: #f2f2f7; border-radius: 10px; padding: 7px 10px;
+        min-height: 52px; max-height: 52px; overflow: hidden;
+        margin-bottom: 10px; word-break: break-word;
+      }
+      #sentence-display:empty::before {
+        content: 'Press \u25B6 to start reading\u2026';
+        color: #aeaeb2; font-style: italic;
+      }
+      #sentence-display mark {
+        background: rgba(255,55,95,0.15); color: #d0004a;
+        border-radius: 3px; padding: 0 1px;
+      }
+
       /* ── Scrubber ────────────────────────────────────── */
       #scrubber-track {
-        height: 4px;
-        background: #e5e5ea;
-        border-radius: 99px;
-        margin-bottom: 6px;
-        cursor: pointer;
-        position: relative;
-        /* Expand hit area without changing visual size */
-        padding: 8px 0;
-        margin-top: -8px;
-        margin-bottom: -2px;
+        height: 4px; background: #e5e5ea; border-radius: 99px;
+        cursor: pointer; position: relative;
+        padding: 8px 0; margin-top: -8px; margin-bottom: -2px;
       }
       #scrubber-fill {
-        height: 4px;
-        width: 0%;
-        background: #ff375f;
-        border-radius: 99px;
-        transition: width 0.5s linear;
-        position: relative;
-        pointer-events: none;
+        height: 4px; width: 0%; background: #ff375f;
+        border-radius: 99px; transition: width 0.5s linear;
+        position: relative; pointer-events: none;
       }
       #scrubber-thumb {
-        position: absolute;
-        right: -5px;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: #ff375f;
-        opacity: 0;
-        transition: opacity 0.15s;
-        pointer-events: none;
+        position: absolute; right: -5px; top: 50%;
+        transform: translateY(-50%); width: 12px; height: 12px;
+        border-radius: 50%; background: #ff375f;
+        opacity: 0; transition: opacity 0.15s; pointer-events: none;
       }
       #scrubber-track:hover #scrubber-thumb { opacity: 1; }
       #scrubber-track:hover #scrubber-fill { transition: none; }
 
       /* Time labels */
       #progress-times {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 14px;
-        font-size: 11px;
-        font-weight: 400;
-        color: #8e8e93;
+        display: flex; justify-content: space-between; margin-bottom: 12px;
+        font-size: 11px; font-weight: 400; color: #8e8e93;
         font-variant-numeric: tabular-nums;
       }
 
-      /* ── Controls ────────────────────────────────────── */
+      /* ── Controls row ────────────────────────────────── */
       #player-controls {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+        display: flex; align-items: center;
+        justify-content: space-between; gap: 4px;
       }
 
-      /* Speed pill */
-      #btn-speed {
-        background: #e5e5ea;
-        border: none;
-        border-radius: 999px;
-        padding: 5px 11px;
-        font-size: 12px;
-        font-weight: 600;
-        color: #3a3a3c;
-        cursor: pointer;
-        transition: background 0.15s;
-        flex-shrink: 0;
+      /* Speed slider wrap */
+      #speed-wrap {
+        display: flex; flex-direction: column; align-items: center;
+        gap: 2px; flex-shrink: 0;
       }
-      #btn-speed:hover { background: #d1d1d6; }
-      #btn-speed:disabled { opacity: 0.35; cursor: not-allowed; }
+      #speed-label { font-size: 10px; font-weight: 700; color: #3a3a3c; }
+      #speed-slider {
+        width: 54px; cursor: pointer; outline: none;
+        -webkit-appearance: none; appearance: none;
+        height: 4px; border-radius: 99px;
+        background: linear-gradient(to right, #ff375f 50%, #e5e5ea 50%);
+      }
+      #speed-slider::-webkit-slider-thumb {
+        -webkit-appearance: none; width: 12px; height: 12px;
+        border-radius: 50%; background: #ff375f; cursor: pointer;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+      }
+      #speed-slider:disabled { opacity: 0.35; cursor: not-allowed; }
 
-      /* Play/pause — large center button */
+      /* Skip buttons */
+      #btn-skip-back, #btn-skip-fwd {
+        background: #e5e5ea; border: none; border-radius: 50%;
+        width: 30px; height: 30px; font-size: 10px; color: #3a3a3c;
+        cursor: pointer; display: flex; align-items: center;
+        justify-content: center; transition: background 0.15s; flex-shrink: 0;
+      }
+      #btn-skip-back:hover, #btn-skip-fwd:hover { background: #d1d1d6; }
+      #btn-skip-back:active, #btn-skip-fwd:active { transform: scale(0.92); }
+      #btn-skip-back:disabled, #btn-skip-fwd:disabled { opacity: 0.35; cursor: not-allowed; }
+
+      /* Play/pause */
       #btn-play {
-        background: #ff375f;
-        border: none;
-        border-radius: 50%;
-        width: 48px;
-        height: 48px;
-        font-size: 18px;
-        color: #fff;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
+        background: #ff375f; border: none; border-radius: 50%;
+        width: 44px; height: 44px; font-size: 16px; color: #fff;
+        cursor: pointer; display: flex; align-items: center;
         justify-content: center;
-        transition: transform 0.15s, background 0.15s;
-        flex-shrink: 0;
+        transition: transform 0.15s, background 0.15s; flex-shrink: 0;
       }
       #btn-play:hover  { transform: scale(1.06); }
       #btn-play:active { transform: scale(0.94); }
       #btn-play:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
 
-      /* Dismiss (was stop) — matches speed pill width visually */
+      /* Done */
       #btn-stop {
-        background: #e5e5ea;
-        border: none;
-        border-radius: 999px;
-        padding: 5px 11px;
-        font-size: 12px;
-        font-weight: 500;
-        color: #3a3a3c;
-        cursor: pointer;
-        transition: background 0.15s;
-        flex-shrink: 0;
+        background: #e5e5ea; border: none; border-radius: 999px;
+        padding: 5px 10px; font-size: 11px; font-weight: 500; color: #3a3a3c;
+        cursor: pointer; transition: background 0.15s; flex-shrink: 0;
       }
       #btn-stop:hover { background: #d1d1d6; }
-      #btn-stop:disabled { opacity: 0.35; cursor: not-allowed; }
     </style>
 
     <!-- Badge -->
@@ -412,42 +384,111 @@
         <button id="btn-close" title="Minimise">✕</button>
       </div>
 
+      <!-- Voice selector -->
+      <select id="voice-select" title="Choose voice"></select>
+
+      <!-- Current sentence display with live word highlight -->
+      <div id="sentence-display"></div>
+
       <!-- Scrubber -->
       <div id="scrubber-track">
-        <div id="scrubber-fill">
-          <div id="scrubber-thumb"></div>
-        </div>
+        <div id="scrubber-fill"><div id="scrubber-thumb"></div></div>
       </div>
       <div id="progress-times">
         <span id="time-elapsed">0:00</span>
         <span id="time-total">${hasContent ? secsToMMSS(totalSecs()) : '--:--'}</span>
       </div>
 
-      <!-- Controls: speed · play · dismiss -->
+      <!-- Controls: speed slider · skip back · play · skip fwd · done -->
       <div id="player-controls">
-        <button id="btn-speed" title="Speed">1×</button>
+        <div id="speed-wrap">
+          <span id="speed-label">1×</span>
+          <input type="range" id="speed-slider" min="0.5" max="3" step="0.25" value="1">
+        </div>
+        <button id="btn-skip-back" title="Previous sentence">◀</button>
         <button id="btn-play" title="Play · Alt+Shift+R">▶</button>
+        <button id="btn-skip-fwd" title="Next sentence">▶▶</button>
         <button id="btn-stop" title="Dismiss">Done</button>
       </div>
     </div>
   `;
 
   // ─── DOM REFERENCES ───────────────────────────────────────────────────────────
-  const badge        = shadow.getElementById('badge');
-  const badgeLabel   = shadow.getElementById('badge-label');
-  const player       = shadow.getElementById('player');
-  const btnPlay      = shadow.getElementById('btn-play');
-  const btnStop      = shadow.getElementById('btn-stop');
-  const btnSpeed     = shadow.getElementById('btn-speed');
-  const timeElapsed  = shadow.getElementById('time-elapsed');
-  const scrubberFill = shadow.getElementById('scrubber-fill');
+  const badge           = shadow.getElementById('badge');
+  const badgeLabel      = shadow.getElementById('badge-label');
+  const player          = shadow.getElementById('player');
+  const btnPlay         = shadow.getElementById('btn-play');
+  const btnSkipBack     = shadow.getElementById('btn-skip-back');
+  const btnSkipFwd      = shadow.getElementById('btn-skip-fwd');
+  const speedSlider     = shadow.getElementById('speed-slider');
+  const speedLabel      = shadow.getElementById('speed-label');
+  const timeElapsed     = shadow.getElementById('time-elapsed');
+  const scrubberFill    = shadow.getElementById('scrubber-fill');
+  const voiceSelect     = shadow.getElementById('voice-select');
+  const sentenceDisplay = shadow.getElementById('sentence-display');
 
   if (!hasContent) {
     btnPlay.disabled = true;
-    btnSpeed.disabled = true;
+    btnSkipBack.disabled = true;
+    btnSkipFwd.disabled = true;
+    speedSlider.disabled = true;
   }
 
-  // Dismiss × on badge — remove the whole widget
+  // ─── TTS ENGINE ───────────────────────────────────────────────────────────────
+  const synth = window.speechSynthesis;
+
+  // ─── VOICE SELECTOR ───────────────────────────────────────────────────────────
+  function updateSliderGradient() {
+    // Fill the track up to the thumb position in brand red
+    const pct = ((tts.rate - 0.5) / 2.5) * 100;
+    speedSlider.style.background =
+      `linear-gradient(to right, #ff375f ${pct}%, #e5e5ea ${pct}%)`;
+  }
+  updateSliderGradient();
+
+  function populateVoices() {
+    const voices = synth.getVoices();
+    if (voices.length === 0) return;
+    voiceSelect.innerHTML = '';
+    const pageLangCode = pageLang.slice(0, 2).toLowerCase();
+    const matching = voices.filter(v => v.lang.toLowerCase().startsWith(pageLangCode));
+    const others   = voices.filter(v => !v.lang.toLowerCase().startsWith(pageLangCode));
+
+    const addOpt = (v) => {
+      const opt = document.createElement('option');
+      opt.value = v.name;
+      opt.textContent = `${v.name} (${v.lang})`;
+      voiceSelect.appendChild(opt);
+    };
+    matching.forEach(addOpt);
+    if (matching.length > 0 && others.length > 0) {
+      const sep = document.createElement('option');
+      sep.disabled = true;
+      sep.textContent = '──────────────';
+      voiceSelect.appendChild(sep);
+    }
+    others.forEach(addOpt);
+
+    // Restore saved voice preference
+    const saved = localStorage.getItem('ra-voice');
+    if (saved && voices.find(v => v.name === saved)) voiceSelect.value = saved;
+  }
+
+  populateVoices();
+  synth.onvoiceschanged = populateVoices;
+
+  voiceSelect.addEventListener('change', () => {
+    localStorage.setItem('ra-voice', voiceSelect.value);
+    // Re-queue immediately so new voice applies to current position
+    if (tts.speaking && !tts.paused) queueFromIndex(tts.index);
+  });
+
+  function getSelectedVoice() {
+    const voices = synth.getVoices();
+    return voices.find(v => v.name === voiceSelect.value) || null;
+  }
+
+  // ─── DISMISS / TOGGLE ─────────────────────────────────────────────────────────
   shadow.getElementById('badge-dismiss').addEventListener('click', (e) => {
     e.stopPropagation(); // don't also open the player
     synth.cancel();
@@ -458,7 +499,6 @@
     host.remove();
   });
 
-  // Toggle badge ↔ player
   badge.addEventListener('click', () => {
     badge.style.display = 'none';
     player.classList.add('visible');
@@ -472,13 +512,12 @@
     tts.paused = false;
     tts.chunkStartTime = 0;
     btnPlay.textContent = '▶';
+    sentenceDisplay.innerHTML = '';
     player.classList.remove('visible');
     badge.style.display = '';
   });
 
-  // ─── TTS ENGINE ───────────────────────────────────────────────────────────────
-  const synth = window.speechSynthesis;
-
+  // ─── PROGRESS ─────────────────────────────────────────────────────────────────
   function updateProgress() {
     if (totalSecs() === 0) return; // nothing to display
     const liveOffset = tts.speaking && !tts.paused && tts.chunkStartTime
@@ -513,7 +552,7 @@
     }, 14000);
   }
 
-  // Saved article chunks — set when reading a selection so we can restore after
+  // ─── SELECTION RESTORE ────────────────────────────────────────────────────────
   let savedChunks = null;
   let savedChunkDurations = null;
 
@@ -536,10 +575,12 @@
     clearTimeout(tts.watchdog);
     stopTicker();
     btnPlay.textContent = '▶';
-    restoreArticleChunks(); // restore article if we were reading a selection
+    sentenceDisplay.innerHTML = ''; // clear sentence display when done
+    restoreArticleChunks();
     updateProgress();
   }
 
+  // ─── QUEUE & TTS ──────────────────────────────────────────────────────────────
   // Generation counter — incremented on every queueFromIndex call.
   // Callbacks from a cancelled/stale queue will see gen !== queueGen and bail,
   // preventing Chrome's spurious onend events from resetting tts.index/tts.speaking.
@@ -558,14 +599,31 @@
     for (let i = startIdx; i < tts.chunks.length; i++) {
       const idx = i;
       const u = new SpeechSynthesisUtterance(tts.chunks[i]);
-      u.rate = tts.rate;
-      u.lang = pageLang;
+      u.rate  = tts.rate;
+      u.lang  = pageLang;
+      u.voice = getSelectedVoice(); // apply the user-chosen voice
 
       u.onstart = () => {
         if (queueGen !== gen) return; // stale queue — ignore
         tts.index = idx;
         tts.chunkStartTime = Date.now();
+        // Show the sentence text; onboundary will highlight individual words
+        sentenceDisplay.textContent = tts.chunks[idx];
         updateProgress();
+      };
+
+      // onboundary fires with charIndex + charLength for each word.
+      // Use it to wrap the current word in <mark> inside the sentence display.
+      u.onboundary = (e) => {
+        if (queueGen !== gen || e.name !== 'word') return;
+        const text = tts.chunks[idx];
+        // charLength may be 0 in some browsers — derive from text if needed
+        const len = e.charLength ||
+          (text.slice(e.charIndex).match(/^\S+/)?.[0]?.length ?? 0);
+        sentenceDisplay.innerHTML =
+          escHtml(text.slice(0, e.charIndex)) +
+          '<mark>' + escHtml(text.slice(e.charIndex, e.charIndex + len)) + '</mark>' +
+          escHtml(text.slice(e.charIndex + len));
       };
 
       u.onend = () => {
@@ -620,19 +678,9 @@
     startTicker();
   }
 
-  // ─── SCRUBBER SEEK ────────────────────────────────────────────────────────────
-  function seekToRatio(ratio) {
-    if (tts.chunks.length === 0) return;
-    const targetSecs = Math.max(0, Math.min(1, ratio)) * totalSecs();
-
-    // Find the chunk index at this time position
-    let acc = 0, idx = chunkDurations.length - 1;
-    for (let i = 0; i < chunkDurations.length; i++) {
-      if (acc + chunkDurations[i] > targetSecs) { idx = i; break; }
-      acc += chunkDurations[i];
-    }
-
-    const wasPlaying = tts.speaking && !tts.paused;
+  // ─── JUMP / SEEK ──────────────────────────────────────────────────────────────
+  // Shared logic for scrubber seek, skip-back, skip-forward.
+  function jumpToIndex(idx, keepPlaying) {
     synth.cancel();
     clearTimeout(tts.watchdog);
     stopTicker();
@@ -640,31 +688,41 @@
     tts.chunkStartTime = 0;
     tts.speaking = false;
     tts.paused = false;
+    sentenceDisplay.innerHTML = '';
 
-    // Jump scrubber immediately (no transition lag)
     scrubberFill.style.transition = 'none';
     updateProgress();
     requestAnimationFrame(() => { scrubberFill.style.transition = ''; });
 
-    if (wasPlaying) {
+    if (keepPlaying) {
       tts.speaking = true;
       btnPlay.textContent = '⏸';
       queueFromIndex(idx);
       startTicker();
     } else {
-      synth.cancel();
       btnPlay.textContent = '▶';
     }
+  }
+
+  function seekToRatio(ratio) {
+    if (tts.chunks.length === 0) return;
+    const targetSecs = Math.max(0, Math.min(1, ratio)) * totalSecs();
+    let acc = 0, idx = chunkDurations.length - 1;
+    for (let i = 0; i < chunkDurations.length; i++) {
+      if (acc + chunkDurations[i] > targetSecs) { idx = i; break; }
+      acc += chunkDurations[i];
+    }
+    jumpToIndex(idx, tts.speaking && !tts.paused);
   }
 
   // ─── BUTTON HANDLERS ──────────────────────────────────────────────────────────
   btnPlay.addEventListener('click', () => {
     if (!tts.speaking && !tts.paused) startReading();    // fresh start
     else if (tts.speaking && !tts.paused) pauseReading(); // pause
-    else if (tts.paused) resumeReading();                // resume
+    else if (tts.paused) resumeReading();                 // resume
   });
 
-  // "Done" dismisses the entire widget and stops audio
+  // Done — dismiss the entire widget and stop audio
   shadow.getElementById('btn-stop').addEventListener('click', () => {
     synth.cancel();
     clearTimeout(tts.watchdog);
@@ -674,20 +732,26 @@
     host.remove();
   });
 
-  // Scrubber click → seek to that position
+  // Scrubber click → seek to that time position
   shadow.getElementById('scrubber-track').addEventListener('click', (e) => {
-    const track = e.currentTarget;
-    const rect = track.getBoundingClientRect();
+    const rect = e.currentTarget.getBoundingClientRect();
     seekToRatio((e.clientX - rect.left) / rect.width);
   });
 
-  // Speed button: cycles 1× → 1.5× → 2× → 0.75× → 1×
-  const SPEEDS = [1.0, 1.5, 2.0, 0.75];
-  btnSpeed.addEventListener('click', () => {
-    const next = SPEEDS[(SPEEDS.indexOf(tts.rate) + 1) % SPEEDS.length];
-    tts.rate = next;
-    btnSpeed.textContent = `${next}×`;
-    // Re-queue at new rate if playing (all queued utterances had old rate baked in)
+  // Skip sentence back / forward
+  btnSkipBack.addEventListener('click', () => {
+    jumpToIndex(Math.max(0, tts.index - 1), tts.speaking && !tts.paused);
+  });
+  btnSkipFwd.addEventListener('click', () => {
+    jumpToIndex(Math.min(tts.chunks.length - 1, tts.index + 1), tts.speaking && !tts.paused);
+  });
+
+  // Speed slider — continuous, 0.5× – 3×
+  speedSlider.addEventListener('input', () => {
+    tts.rate = parseFloat(speedSlider.value);
+    speedLabel.textContent = `${tts.rate}×`;
+    updateSliderGradient();
+    // Re-queue so all pending utterances use the new rate (rate is baked in at queue time)
     if (tts.speaking && !tts.paused) queueFromIndex(tts.index);
   });
 
@@ -704,9 +768,7 @@
   // With the queued approach this should rarely be needed, but kept as a safety net.
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && tts.speaking && !tts.paused) {
-      if (!synth.speaking && !synth.pending) {
-        queueFromIndex(tts.index);
-      }
+      if (!synth.speaking && !synth.pending) queueFromIndex(tts.index);
     }
   });
 
@@ -792,9 +854,11 @@
     shadow.getElementById('time-total').textContent = secsToMMSS(totalSecs());
     updateProgress();
 
-    // Open player and start reading (enable controls even if page had no article)
+    // Open player and enable all controls (even if page had no article)
     btnPlay.disabled = false;
-    btnSpeed.disabled = false;
+    btnSkipBack.disabled = false;
+    btnSkipFwd.disabled = false;
+    speedSlider.disabled = false;
     badge.style.display = 'none';
     player.classList.add('visible');
     tts.speaking = true;
@@ -827,7 +891,6 @@
         // Update only the text label — preserve the SVG icon inside the badge
         badgeLabel.textContent = readingTime(newText);
         btnPlay.disabled = false;
-        btnStop.disabled = false;
         updateProgress();
       }
     }, 1500);
