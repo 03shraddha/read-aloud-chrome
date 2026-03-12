@@ -7,6 +7,10 @@
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
   },
+  "action": {},
+  "background": {
+    "service_worker": "background.js"
+  },
   "host_permissions": ["<all_urls>"],
   "content_scripts": [
     {

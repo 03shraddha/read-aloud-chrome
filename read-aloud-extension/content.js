@@ -106,6 +106,11 @@
 
   runInitWithRetry();
 
+  // Re-show the widget when the user clicks the extension icon after dismissing it
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.action === 'show') runInitWithRetry();
+  });
+
   // ─── 6. SPA NAVIGATION DETECTION ─────────────────────────────────────────────
   // React, Next.js, Substack, Medium navigate via history API without page reload.
   // Detect URL changes, tear down old UI, and re-initialise for the new article.
@@ -117,9 +122,9 @@
     // Stop any active speech before tearing down
     window.speechSynthesis.cancel();
 
-    // Remove old badge/player
-    const existing = document.getElementById('ra-host');
-    if (existing) existing.remove();
+    // Remove old badge/player and selection button
+    document.getElementById('ra-host')?.remove();
+    document.getElementById('ra-sel-host')?.remove();
     uiCreated = false;
 
     // Wait for Substack/Next.js to clear old DOM and start rendering new content
@@ -443,7 +448,8 @@
     synth.cancel();
     clearTimeout(tts.watchdog);
     stopTicker();
-    if (document.getElementById('ra-sel-host')) document.getElementById('ra-sel-host').remove();
+    document.getElementById('ra-sel-host')?.remove();
+    uiCreated = false; // allow re-init when icon is clicked again
     host.remove();
   });
 
@@ -648,8 +654,8 @@
     synth.cancel();
     clearTimeout(tts.watchdog);
     stopTicker();
-    const selHost = document.getElementById('ra-sel-host');
-    if (selHost) selHost.remove();
+    document.getElementById('ra-sel-host')?.remove();
+    uiCreated = false; // allow re-init when icon is clicked again
     host.remove();
   });
 
