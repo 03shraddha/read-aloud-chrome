@@ -475,7 +475,7 @@
   const synth = window.speechSynthesis;
 
   function updateProgress() {
-    if (!hasContent) return;
+    if (totalSecs() === 0) return; // nothing to display
     const liveOffset = tts.speaking && !tts.paused && tts.chunkStartTime
       ? (Date.now() - tts.chunkStartTime) / 1000 / tts.rate
       : 0;
@@ -607,7 +607,7 @@
 
   // ─── SCRUBBER SEEK ────────────────────────────────────────────────────────────
   function seekToRatio(ratio) {
-    if (!hasContent || tts.chunks.length === 0) return;
+    if (tts.chunks.length === 0) return;
     const targetSecs = Math.max(0, Math.min(1, ratio)) * totalSecs();
 
     // Find the chunk index at this time position
@@ -777,7 +777,9 @@
     shadow.getElementById('time-total').textContent = secsToMMSS(totalSecs());
     updateProgress();
 
-    // Open player and start reading
+    // Open player and start reading (enable controls even if page had no article)
+    btnPlay.disabled = false;
+    btnSpeed.disabled = false;
     badge.style.display = 'none';
     player.classList.add('visible');
     tts.speaking = true;
