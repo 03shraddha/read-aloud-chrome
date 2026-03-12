@@ -535,11 +535,18 @@
     updateProgress();
   }
 
+  // Generation counter — incremented on every queueFromIndex call.
+  // Callbacks from a cancelled/stale queue will see gen !== queueGen and bail,
+  // preventing Chrome's spurious onend events from resetting tts.index/tts.speaking.
+  let queueGen = 0;
+
   // Queue ALL remaining chunks at once so Chrome plays them in sequence even in
   // background tabs (Chrome blocks new JS-initiated speak() calls when backgrounded,
   // but continues playing an already-loaded queue).
   function queueFromIndex(startIdx) {
     synth.cancel();
+    queueGen++;
+    const gen = queueGen;
     tts.index = startIdx;
     updateProgress();
 
@@ -550,12 +557,14 @@
       u.lang = pageLang;
 
       u.onstart = () => {
+        if (queueGen !== gen) return; // stale queue — ignore
         tts.index = idx;
         tts.chunkStartTime = Date.now();
         updateProgress();
       };
 
       u.onend = () => {
+        if (queueGen !== gen) return; // stale queue — ignore
         clearTimeout(tts.watchdog);
         if (idx >= tts.chunks.length - 1) {
           onFinished();
@@ -566,6 +575,7 @@
       };
 
       u.onerror = (e) => {
+        if (queueGen !== gen) return; // stale queue — ignore
         if (e.error !== 'interrupted') {
           console.warn('[ReadAloud] TTS error:', e.error);
           onFinished();
