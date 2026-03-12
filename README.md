@@ -4,11 +4,15 @@ A free, no-account Chrome extension that shows estimated reading time on any art
 
 ## Features
 
-- Shows reading time badge on any article page
-- Reads the article aloud with play/pause/stop controls
-- Works on Medium, Substack, news sites, blogs, and more
+- **Reading time badge** — shows estimated read time in the bottom-right corner on any article page
+- **Play / Pause / Speed controls** — play at 0.75×, 1×, 1.5×, or 2× speed
+- **Seekable scrubber** — click anywhere on the progress bar to jump to that position
+- **Selection reading** — highlight any text on the page → a "Read selection" button appears → reads just that portion, then resumes the article
+- **Background tab playback** — audio continues playing when you switch to another tab
+- **Re-open after dismiss** — click the extension icon in the toolbar to bring the widget back after closing it
+- **SPA navigation** — automatically detects page changes on React/Next.js/Substack/Medium and resets for the new article
+- **Keyboard shortcut** — `Alt + Shift + R` to toggle play/pause
 - No account, no server, no tracking — runs entirely in your browser
-- Keyboard shortcut: `Alt + Shift + R` to toggle play/pause
 
 ## Installation (Developer Mode)
 
@@ -38,6 +42,7 @@ Your folder should look like this:
 ```
 read-aloud-extension/
 ├── manifest.json
+├── background.js
 ├── Readability.js    ← file you just downloaded
 ├── content.js
 └── icons/
@@ -52,24 +57,30 @@ read-aloud-extension/
 3. Click **Load unpacked**
 4. Select the `read-aloud-extension/` folder
 
-The extension is now installed.
+The extension is now installed. Pin it to your toolbar for quick access.
 
 ## How to Use
 
 1. Navigate to any article or blog post
-2. Look for the pink **reading time badge** in the bottom-right corner of the page
+2. Look for the pink **reading time badge** in the bottom-right corner
 3. Click the badge to open the player
 4. Press **▶** to start reading aloud
-5. Press **⏸** to pause, **■** to stop and reset
+5. Use the scrubber to skip forward/back, or change speed with the **1×** button
+6. Press **✕** to stop and minimise back to the badge, or **Done** to dismiss entirely
+
+**Read a selection:** highlight any text → click the red **Read selection** button that appears → the extension reads only that text.
+
+**Re-open after dismiss:** click the extension icon in the Chrome toolbar.
 
 You can also use `Alt + Shift + R` to toggle play/pause from your keyboard.
 
 ## How It Works
 
-- Uses [Mozilla Readability](https://github.com/mozilla/readability) to extract the main article text from the page
-- Falls back to semantic HTML selectors (`<article>`, `<main>`, etc.) if Readability doesn't find enough content
-- Splits text into small chunks and uses the browser's built-in `SpeechSynthesis` API to read them aloud
-- Includes a fix for a Chrome bug where speech synthesis silently stops after ~15 seconds
+- Uses [Mozilla Readability](https://github.com/mozilla/readability) to extract the main article text
+- Falls back to semantic HTML selectors (`<article>`, `[role="article"]`, etc.) if Readability finds insufficient content
+- Splits text into sentence-grouped chunks and queues them all at once with the browser's `SpeechSynthesis` API — this allows audio to continue in background tabs without Chrome killing playback
+- A generation counter on each queue prevents stale callbacks (e.g. Chrome firing `onend` for cancelled utterances) from resetting playback position
+- Shadow DOM ensures the widget's styles never conflict with the page
 
 ## Limitations
 
