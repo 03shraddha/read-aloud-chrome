@@ -695,11 +695,25 @@
     }
   });
 
-  // Tab visibility: if TTS died while backgrounded (Chrome bug), restart queue on return.
-  // With the queued approach this should rarely be needed, but kept as a safety net.
+  // Tab visibility: resync TTS and UI when the user returns to this tab.
+  //
+  // Chrome has two distinct background-tab failure modes:
+  //   1. It suspends speechSynthesis entirely → synth.paused becomes true even though
+  //      tts.paused is false (the user never pressed pause). The button then mis-fires
+  //      on the next click (calls pauseReading on an already-paused synth, leaving the
+  //      UI stuck one click behind reality).
+  //   2. The whole utterance queue is silently dropped → synth.speaking and synth.pending
+  //      both become false while tts.speaking is still true.
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && tts.speaking && !tts.paused) {
-      if (!synth.speaking && !synth.pending) {
+      if (synth.paused) {
+        // Mode 1: Chrome suspended synthesis while backgrounded (or the watchdog's
+        // synth.resume() was silently ignored in the hidden tab). Resume without
+        // touching tts state — from the user's perspective playback never stopped.
+        synth.resume();
+        resetWatchdog();
+      } else if (!synth.speaking && !synth.pending) {
+        // Mode 2: the queue was dropped entirely — rebuild it from the current index.
         queueFromIndex(tts.index);
       }
     }
