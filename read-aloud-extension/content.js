@@ -454,9 +454,15 @@
   });
 
   shadow.getElementById('btn-close').addEventListener('click', () => {
+    synth.cancel();
+    clearTimeout(tts.watchdog);
+    stopTicker();
+    tts.speaking = false;
+    tts.paused = false;
+    tts.chunkStartTime = 0;
+    btnPlay.textContent = '▶';
     player.classList.remove('visible');
     badge.style.display = '';
-    // NOTE: audio keeps playing if user closes the bar — intentional UX
   });
 
   // ─── TTS ENGINE ───────────────────────────────────────────────────────────────
@@ -523,44 +529,53 @@
     updateProgress();
   }
 
-  function speakChunk(index) {
-    if (index >= tts.chunks.length) {
-      onFinished();
-      return;
-    }
-
-    tts.index = index;
+  // Queue ALL remaining chunks at once so Chrome plays them in sequence even in
+  // background tabs (Chrome blocks new JS-initiated speak() calls when backgrounded,
+  // but continues playing an already-loaded queue).
+  function queueFromIndex(startIdx) {
+    synth.cancel();
+    tts.index = startIdx;
     updateProgress();
 
-    tts.chunkStartTime = Date.now();
-    const u = new SpeechSynthesisUtterance(tts.chunks[index]);
-    u.rate = tts.rate;
-    // Use the page's declared language so foreign-language articles sound correct
-    u.lang = pageLang;
+    for (let i = startIdx; i < tts.chunks.length; i++) {
+      const idx = i;
+      const u = new SpeechSynthesisUtterance(tts.chunks[i]);
+      u.rate = tts.rate;
+      u.lang = pageLang;
 
-    u.onend = () => {
-      clearTimeout(tts.watchdog);
-      if (!tts.paused) speakChunk(index + 1);
-    };
+      u.onstart = () => {
+        tts.index = idx;
+        tts.chunkStartTime = Date.now();
+        updateProgress();
+      };
 
-    u.onerror = (e) => {
-      // 'interrupted' fires on manual cancel/pause — not a real error
-      if (e.error !== 'interrupted') {
-        console.warn('[ReadAloud] TTS error:', e.error);
-        onFinished();
-      }
-    };
+      u.onend = () => {
+        clearTimeout(tts.watchdog);
+        if (idx >= tts.chunks.length - 1) {
+          onFinished();
+        } else {
+          tts.index = idx + 1;
+          resetWatchdog();
+        }
+      };
 
-    synth.speak(u);
+      u.onerror = (e) => {
+        if (e.error !== 'interrupted') {
+          console.warn('[ReadAloud] TTS error:', e.error);
+          onFinished();
+        }
+      };
+
+      synth.speak(u);
+    }
     resetWatchdog();
   }
 
   function startReading() {
-    synth.cancel(); // clear any stale queue
     tts.speaking = true;
     tts.paused = false;
     btnPlay.textContent = '⏸';
-    speakChunk(tts.index);
+    queueFromIndex(tts.index);
     startTicker();
   }
 
@@ -613,9 +628,10 @@
     if (wasPlaying) {
       tts.speaking = true;
       btnPlay.textContent = '⏸';
-      speakChunk(idx);
+      queueFromIndex(idx);
       startTicker();
     } else {
+      synth.cancel();
       btnPlay.textContent = '▶';
     }
   }
@@ -645,12 +661,13 @@
   });
 
   // Speed button: cycles 1× → 1.5× → 2× → 0.75× → 1×
-  // Rate applies from the next chunk — no restart of current chunk
   const SPEEDS = [1.0, 1.5, 2.0, 0.75];
   btnSpeed.addEventListener('click', () => {
     const next = SPEEDS[(SPEEDS.indexOf(tts.rate) + 1) % SPEEDS.length];
     tts.rate = next;
     btnSpeed.textContent = `${next}×`;
+    // Re-queue at new rate if playing (all queued utterances had old rate baked in)
+    if (tts.speaking && !tts.paused) queueFromIndex(tts.index);
   });
 
   // Keyboard shortcut: Alt+Shift+R to toggle play/pause
@@ -662,12 +679,13 @@
     }
   });
 
-  // Tab visibility: Chrome TTS silently dies when a tab is backgrounded.
-  // When the tab becomes visible again and speech was active, restart from current chunk.
+  // Tab visibility: if TTS died while backgrounded (Chrome bug), restart queue on return.
+  // With the queued approach this should rarely be needed, but kept as a safety net.
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && tts.speaking && !tts.paused) {
-      synth.cancel();
-      setTimeout(() => speakChunk(tts.index), 100);
+      if (!synth.speaking && !synth.pending) {
+        queueFromIndex(tts.index);
+      }
     }
   });
 
@@ -756,11 +774,10 @@
     // Open player and start reading
     badge.style.display = 'none';
     player.classList.add('visible');
-    synth.cancel();
     tts.speaking = true;
     tts.paused = false;
     btnPlay.textContent = '⏸';
-    speakChunk(0);
+    queueFromIndex(0);
     startTicker();
   });
 
