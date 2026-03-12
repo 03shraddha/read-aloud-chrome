@@ -667,8 +667,10 @@
     tts.speaking = false;
     clearTimeout(tts.watchdog);
     stopTicker();
-    // synth.pause()/resume() is unreliable in Chrome with a queued-all-chunks approach.
-    // Cancel all queued utterances and re-queue from the same index on resume instead.
+    // Increment queueGen BEFORE cancel so the onend/onerror events Chrome fires for
+    // all the queued-but-not-yet-started utterances are treated as stale and ignored.
+    // Without this, those callbacks run with the old gen and corrupt tts.index.
+    queueGen++;
     synth.cancel();
     btnPlay.textContent = '▶';
     updateProgress();
@@ -688,6 +690,9 @@
   // ─── JUMP / SEEK ──────────────────────────────────────────────────────────────
   // Shared logic for scrubber seek, skip-back, skip-forward.
   function jumpToIndex(idx, keepPlaying) {
+    // Invalidate pending callbacks before cancel for the same reason as pauseReading.
+    // queueFromIndex will increment again when re-queuing, which is fine.
+    queueGen++;
     synth.cancel();
     clearTimeout(tts.watchdog);
     stopTicker();
