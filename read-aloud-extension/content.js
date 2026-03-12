@@ -181,181 +181,215 @@
 
   shadow.innerHTML = `
     <style>
-      * { box-sizing: border-box; margin: 0; padding: 0; }
+      * { box-sizing: border-box; margin: 0; padding: 0;
+          font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif; }
 
-      /* shared font — system stack, no external request */
-      * { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
-
-      /* ── Badge (collapsed) ───────────────────────────── */
+      /* ── Badge ───────────────────────────────────────── */
       #badge {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: #f43f7e;
-        color: #fff;
-        padding: 7px 14px 7px 11px;
-        border-radius: 999px;
+        background: rgba(255,255,255,0.92);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(0,0,0,0.08);
+        color: #1c1c1e;
+        padding: 6px 13px 6px 10px;
+        border-radius: 20px;
         font-size: 13px;
-        font-weight: 600;
+        font-weight: 500;
         cursor: pointer;
         user-select: none;
         white-space: nowrap;
-        box-shadow: 0 2px 10px rgba(244,63,126,0.35);
-        transition: box-shadow 0.15s, transform 0.15s;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        transition: box-shadow 0.2s, transform 0.2s;
       }
-      #badge:hover  { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(244,63,126,0.4); }
-      #badge:active { transform: translateY(1px);  box-shadow: 0 1px 6px rgba(244,63,126,0.3); }
+      #badge:hover  { transform: scale(1.02); box-shadow: 0 4px 20px rgba(0,0,0,0.14); }
+      #badge:active { transform: scale(0.98); }
 
-      /* ── Player card (expanded) ──────────────────────── */
+      /* ── Player card ─────────────────────────────────── */
       #player {
         display: none;
         flex-direction: column;
-        background: #ffffff;
-        border-radius: 16px;
-        box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.06);
-        min-width: 260px;
-        overflow: hidden;
+        background: rgba(255,255,255,0.94);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(0,0,0,0.08);
+        border-radius: 22px;
+        box-shadow: 0 8px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+        width: 280px;
+        padding: 16px 16px 14px;
+        gap: 0;
       }
       #player.visible { display: flex; }
 
-      /* Thin pink accent bar at top */
-      #player-stripe {
-        background: #f43f7e;
-        height: 3px;
-        width: 100%;
-      }
-
-      /* Header */
+      /* Header row */
       #player-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 10px 12px 6px;
+        margin-bottom: 14px;
       }
       #player-title {
-        font-size: 11px;
-        font-weight: 700;
-        color: #9ca3af;
-        letter-spacing: 1px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #8e8e93;
+        letter-spacing: 0.3px;
         text-transform: uppercase;
-        display: flex;
-        align-items: center;
-        gap: 5px;
       }
 
-      /* Controls row */
-      #player-controls {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 4px 12px 12px;
-      }
-
-      /* ── Buttons ─────────────────────────────────────── */
-      button {
+      /* Close button */
+      #btn-close {
+        background: #e5e5ea;
         border: none;
         border-radius: 50%;
-        width: 34px;
-        height: 34px;
-        font-size: 13px;
+        width: 22px;
+        height: 22px;
+        font-size: 11px;
+        color: #6c6c70;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
+        transition: background 0.15s;
         flex-shrink: 0;
-        transition: opacity 0.15s, transform 0.15s;
       }
-      button:hover  { opacity: 0.85; transform: translateY(-1px); }
-      button:active { opacity: 1;    transform: translateY(1px); }
-      button:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+      #btn-close:hover { background: #d1d1d6; }
 
-      /* Play/pause — pink */
-      #btn-play { background: #f43f7e; color: #fff; font-size: 14px; }
+      /* ── Scrubber ────────────────────────────────────── */
+      #scrubber-track {
+        height: 3px;
+        background: #e5e5ea;
+        border-radius: 99px;
+        margin-bottom: 6px;
+        overflow: hidden;
+      }
+      #scrubber-fill {
+        height: 100%;
+        width: 0%;
+        background: #ff375f;
+        border-radius: 99px;
+        transition: width 0.5s linear;
+      }
 
-      /* Stop — light gray */
-      #btn-stop { background: #f3f4f6; color: #374151; font-size: 11px; }
-
-      /* Speed — pill, gray */
-      #btn-speed {
-        background: #f3f4f6;
-        color: #374151;
-        border-radius: 999px;
-        width: auto;
-        height: 28px;
-        padding: 0 10px;
+      /* Time labels */
+      #progress-times {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 14px;
         font-size: 11px;
-        font-weight: 600;
-      }
-
-      /* Close — top-right, minimal */
-      #btn-close {
-        background: transparent;
-        color: #9ca3af;
-        border-radius: 50%;
-        width: 22px;
-        height: 22px;
-        font-size: 12px;
-      }
-      #btn-close:hover { background: #f3f4f6; color: #374151; }
-
-      /* ── Progress label ──────────────────────────────── */
-      #progress {
-        flex: 1;
-        font-size: 12px;
-        font-weight: 500;
-        color: #6b7280;
-        text-align: right;
+        font-weight: 400;
+        color: #8e8e93;
         font-variant-numeric: tabular-nums;
       }
+
+      /* ── Controls ────────────────────────────────────── */
+      #player-controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      /* Speed pill */
+      #btn-speed {
+        background: #e5e5ea;
+        border: none;
+        border-radius: 999px;
+        padding: 5px 11px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #3a3a3c;
+        cursor: pointer;
+        transition: background 0.15s;
+        flex-shrink: 0;
+      }
+      #btn-speed:hover { background: #d1d1d6; }
+      #btn-speed:disabled { opacity: 0.35; cursor: not-allowed; }
+
+      /* Play/pause — large center button */
+      #btn-play {
+        background: #ff375f;
+        border: none;
+        border-radius: 50%;
+        width: 48px;
+        height: 48px;
+        font-size: 18px;
+        color: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.15s, background 0.15s;
+        flex-shrink: 0;
+      }
+      #btn-play:hover  { transform: scale(1.06); }
+      #btn-play:active { transform: scale(0.94); }
+      #btn-play:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+      /* Dismiss (was stop) — matches speed pill width visually */
+      #btn-stop {
+        background: #e5e5ea;
+        border: none;
+        border-radius: 999px;
+        padding: 5px 11px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #3a3a3c;
+        cursor: pointer;
+        transition: background 0.15s;
+        flex-shrink: 0;
+      }
+      #btn-stop:hover { background: #d1d1d6; }
+      #btn-stop:disabled { opacity: 0.35; cursor: not-allowed; }
     </style>
 
-    <!-- Collapsed pill badge -->
+    <!-- Badge -->
     <div id="badge">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-        <path d="M3 18v-6a9 9 0 0118 0v6" stroke="rgba(255,255,255,0.9)" stroke-width="2.5" stroke-linecap="round"/>
-        <rect x="1" y="16" width="4" height="6" rx="2" fill="rgba(255,255,255,0.9)"/>
-        <rect x="19" y="16" width="4" height="6" rx="2" fill="rgba(255,255,255,0.9)"/>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+        <path d="M3 18v-6a9 9 0 0118 0v6" stroke="#ff375f" stroke-width="2.5" stroke-linecap="round"/>
+        <rect x="1" y="16" width="4" height="6" rx="2" fill="#ff375f"/>
+        <rect x="19" y="16" width="4" height="6" rx="2" fill="#ff375f"/>
       </svg>
       <span id="badge-label">${hasContent ? readingTime(articleText) : '< 1 min read'}</span>
     </div>
 
-    <!-- Expanded player card -->
+    <!-- Player -->
     <div id="player">
-      <div id="player-stripe"></div>
-
       <div id="player-head">
-        <span id="player-title">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path d="M9 18V5l12-2v13" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="6" cy="18" r="3" stroke="#9ca3af" stroke-width="2"/>
-            <circle cx="18" cy="16" r="3" stroke="#9ca3af" stroke-width="2"/>
-          </svg>
-          Read Aloud
-        </span>
-        <button id="btn-close" title="Close">✕</button>
+        <span id="player-title">Read Aloud</span>
+        <button id="btn-close" title="Minimise">✕</button>
       </div>
 
+      <!-- Scrubber -->
+      <div id="scrubber-track">
+        <div id="scrubber-fill"></div>
+      </div>
+      <div id="progress-times">
+        <span id="time-elapsed">0:00</span>
+        <span id="time-total">${hasContent ? secsToMMSS(totalSecs()) : '--:--'}</span>
+      </div>
+
+      <!-- Controls: speed · play · dismiss -->
       <div id="player-controls">
+        <button id="btn-speed" title="Speed">1×</button>
         <button id="btn-play" title="Play · Alt+Shift+R">▶</button>
-        <button id="btn-stop" title="Stop">■</button>
-        <button id="btn-speed" title="Change speed">1×</button>
-        <span id="progress">${hasContent ? `0:00 / ${secsToMMSS(totalSecs())}` : 'Too short'}</span>
+        <button id="btn-stop" title="Dismiss">Done</button>
       </div>
     </div>
   `;
 
   // ─── DOM REFERENCES ───────────────────────────────────────────────────────────
-  const badge      = shadow.getElementById('badge');
-  const badgeLabel = shadow.getElementById('badge-label');
-  const player     = shadow.getElementById('player');
-  const btnPlay    = shadow.getElementById('btn-play');
-  const btnStop    = shadow.getElementById('btn-stop');
-  const btnSpeed   = shadow.getElementById('btn-speed');
-  const progress   = shadow.getElementById('progress');
+  const badge        = shadow.getElementById('badge');
+  const badgeLabel   = shadow.getElementById('badge-label');
+  const player       = shadow.getElementById('player');
+  const btnPlay      = shadow.getElementById('btn-play');
+  const btnStop      = shadow.getElementById('btn-stop');
+  const btnSpeed     = shadow.getElementById('btn-speed');
+  const timeElapsed  = shadow.getElementById('time-elapsed');
+  const scrubberFill = shadow.getElementById('scrubber-fill');
 
   if (!hasContent) {
     btnPlay.disabled = true;
-    btnStop.disabled = true;
     btnSpeed.disabled = true;
   }
 
@@ -376,12 +410,13 @@
 
   function updateProgress() {
     if (!hasContent) return;
-    // Add real-time offset within the current chunk so display ticks smoothly
     const liveOffset = tts.speaking && !tts.paused && tts.chunkStartTime
       ? (Date.now() - tts.chunkStartTime) / 1000 / tts.rate
       : 0;
     const elapsed = Math.min(elapsedSecs(tts.index) + liveOffset, totalSecs());
-    progress.textContent = `${secsToMMSS(elapsed)} / ${secsToMMSS(totalSecs())}`;
+    const total = totalSecs();
+    timeElapsed.textContent = secsToMMSS(elapsed);
+    scrubberFill.style.width = total > 0 ? `${(elapsed / total) * 100}%` : '0%';
   }
 
   function startTicker() {
@@ -498,7 +533,13 @@
     else if (tts.paused) resumeReading();                // resume
   });
 
-  shadow.getElementById('btn-stop').addEventListener('click', stopReading);
+  // "Done" dismisses the entire widget and stops audio
+  shadow.getElementById('btn-stop').addEventListener('click', () => {
+    synth.cancel();
+    clearTimeout(tts.watchdog);
+    stopTicker();
+    host.remove();
+  });
 
   // Speed button: cycles 1× → 1.5× → 2× → 0.75× → 1×
   const SPEEDS = [1.0, 1.5, 2.0, 0.75];
