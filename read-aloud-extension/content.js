@@ -270,9 +270,11 @@
       #sentence-display {
         font-size: 12px; line-height: 1.55; color: #3a3a3c;
         background: #f2f2f7; border-radius: 10px; padding: 7px 10px;
-        min-height: 52px; max-height: 52px; overflow: hidden;
+        min-height: 52px; max-height: 52px; overflow-y: scroll;
+        scrollbar-width: none; -ms-overflow-style: none;
         margin-bottom: 10px; word-break: break-word;
       }
+      #sentence-display::-webkit-scrollbar { display: none; }
       #sentence-display:empty::before {
         content: 'Press \u25B6 to start reading\u2026';
         color: #aeaeb2; font-style: italic;
@@ -624,6 +626,8 @@
           escHtml(text.slice(0, e.charIndex)) +
           '<mark>' + escHtml(text.slice(e.charIndex, e.charIndex + len)) + '</mark>' +
           escHtml(text.slice(e.charIndex + len));
+        // Keep the highlighted word visible in the fixed-height box
+        sentenceDisplay.querySelector('mark')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       };
 
       u.onend = () => {
@@ -663,7 +667,9 @@
     tts.speaking = false;
     clearTimeout(tts.watchdog);
     stopTicker();
-    synth.pause();
+    // synth.pause()/resume() is unreliable in Chrome with a queued-all-chunks approach.
+    // Cancel all queued utterances and re-queue from the same index on resume instead.
+    synth.cancel();
     btnPlay.textContent = '▶';
     updateProgress();
   }
@@ -671,9 +677,10 @@
   function resumeReading() {
     tts.paused = false;
     tts.speaking = true;
-    tts.chunkStartTime = Date.now(); // reset timer for resumed chunk
-    synth.resume();
+    tts.chunkStartTime = Date.now();
     btnPlay.textContent = '⏸';
+    // Re-queue from the saved index — restarts from the beginning of the current sentence
+    queueFromIndex(tts.index);
     resetWatchdog();
     startTicker();
   }
