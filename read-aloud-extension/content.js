@@ -207,6 +207,25 @@
       #badge:hover  { transform: scale(1.02); box-shadow: 0 4px 20px rgba(0,0,0,0.14); }
       #badge:active { transform: scale(0.98); }
 
+      /* Dismiss ×  on the badge */
+      #badge-dismiss {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: transparent;
+        color: #8e8e93;
+        font-size: 11px;
+        line-height: 1;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: color 0.15s, background 0.15s;
+        margin-left: 2px;
+      }
+      #badge-dismiss:hover { background: #e5e5ea; color: #3a3a3c; }
+
       /* ── Player card ─────────────────────────────────── */
       #player {
         display: none;
@@ -351,6 +370,7 @@
         <rect x="19" y="16" width="4" height="6" rx="2" fill="#ff375f"/>
       </svg>
       <span id="badge-label">${hasContent ? readingTime(articleText) : '< 1 min read'}</span>
+      <span id="badge-dismiss" title="Dismiss">✕</span>
     </div>
 
     <!-- Player -->
@@ -392,6 +412,15 @@
     btnPlay.disabled = true;
     btnSpeed.disabled = true;
   }
+
+  // Dismiss × on badge — remove the whole widget
+  shadow.getElementById('badge-dismiss').addEventListener('click', (e) => {
+    e.stopPropagation(); // don't also open the player
+    synth.cancel();
+    clearTimeout(tts.watchdog);
+    stopTicker();
+    host.remove();
+  });
 
   // Toggle badge ↔ player
   badge.addEventListener('click', () => {
